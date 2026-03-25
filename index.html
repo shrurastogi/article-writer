@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MM Article Writer</title>
+  <title>Medical Article Writer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,6 +21,9 @@
       --ai: #7c3aed;
       --ai-light: #f5f3ff;
       --ai-border: #ddd6fe;
+      --pubmed: #0369a1;
+      --pubmed-light: #f0f9ff;
+      --pubmed-border: #bae6fd;
     }
 
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -142,6 +145,29 @@
     .p-abstract-box { page-break-inside: avoid; }
     .p-empty { text-align: center; color: #94a3b8; margin-top: 80px; font-family: sans-serif; font-size: 14px; }
 
+    /* ── PubMed ── */
+    .pubmed-panel {
+      background: var(--pubmed-light); border: 1px solid var(--pubmed-border);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+    }
+    .pubmed-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .pubmed-search-row input { flex: 1; }
+    .btn-pubmed { background: var(--pubmed); color: #fff; }
+    .btn-pubmed:hover { background: #075985; }
+    .pubmed-results { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .pubmed-article {
+      background: #fff; border: 1px solid var(--pubmed-border);
+      border-radius: 6px; padding: 10px 12px; font-size: 0.8rem;
+    }
+    .pubmed-article-title { font-weight: 600; color: var(--pubmed); margin-bottom: 3px; line-height: 1.4; }
+    .pubmed-article-meta { color: var(--muted); font-size: 0.75rem; margin-bottom: 5px; }
+    .pubmed-article-abstract { color: var(--text); line-height: 1.5; max-height: 80px; overflow: hidden; position: relative; }
+    .pubmed-article-abstract.expanded { max-height: none; }
+    .pubmed-expand { color: var(--pubmed); cursor: pointer; font-size: 0.75rem; text-decoration: underline; display: inline-block; margin-top: 3px; }
+    .pubmed-use-btn { margin-top: 6px; }
+    .pubmed-empty { color: var(--muted); font-size: 0.82rem; text-align: center; padding: 16px 0; }
+    .pubmed-section-label { font-size: 0.78rem; font-weight: 600; color: var(--pubmed); margin-bottom: 8px; }
+
     /* ── Toast ── */
     .toast {
       position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: #fff;
@@ -156,7 +182,7 @@
 <body>
 
 <header>
-  <div class="logo">MM <span>Article Writer</span></div>
+  <div class="logo">Medical <span>Article Writer</span></div>
   <div class="header-right">
     <span class="total-wc" id="total-wc">0 words</span>
     <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
@@ -175,6 +201,10 @@
       <div class="panel-header"><span class="panel-title">Article Details</span></div>
       <div class="panel-body">
         <div class="form-group">
+          <label>Medical Topic <span style="font-weight:400;color:var(--muted)">(used to guide all AI generation)</span></label>
+          <input type="text" id="medical-topic" placeholder="e.g., Multiple Myeloma, Chronic Lymphocytic Leukemia, Lupus Nephritis..." oninput="updateMeta()" />
+        </div>
+        <div class="form-group">
           <label>Article Title</label>
           <input type="text" id="article-title" placeholder="e.g., Multiple Myeloma: A Comprehensive Review of Pathophysiology, Diagnosis, and Emerging Therapies" oninput="updateMeta()" />
         </div>
@@ -185,6 +215,23 @@
         <div class="form-group" style="margin-bottom:0">
           <label>Keywords <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label>
           <input type="text" id="keywords" placeholder="Multiple myeloma, plasma cell disorder, IMiD, proteasome inhibitor, CAR-T, bispecific antibody" oninput="updateMeta()" />
+        </div>
+      </div>
+    </div>
+
+    <!-- PubMed search -->
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header">
+        <span class="panel-title">PubMed Search</span>
+        <span style="font-size:0.78rem;color:var(--muted)">Find references to ground AI generation</span>
+      </div>
+      <div class="panel-body" style="padding-bottom:12px">
+        <div class="pubmed-search-row">
+          <input type="text" id="pubmed-query" placeholder="Search PubMed (uses topic if blank)..." onkeydown="if(event.key==='Enter')searchPubMed()" />
+          <button class="btn btn-pubmed btn-sm" onclick="searchPubMed()" id="pubmed-btn">Search</button>
+        </div>
+        <div id="pubmed-results" class="pubmed-results">
+          <div class="pubmed-empty">Search PubMed for references. Results will appear here.</div>
         </div>
       </div>
     </div>
@@ -417,19 +464,28 @@ async function streamToAiBox(url, body, sectionId, label, canApply) {
 }
 
 // ── AI features ──
+function getTopic() {
+  return document.getElementById("medical-topic")?.value.trim() || "";
+}
+
 function generateDraft(id, title) {
   const notes = document.getElementById(`notes-${id}`)?.value || "";
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes }, id, "✨ Generated Draft", true);
+  const topic = getTopic();
+  const pubmedContext = getSelectedPubmedContext();
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext }, id, "✨ Generated Draft", true);
 }
 
 function improveSection(id, title) {
   const content = state.sections[id];
   if (!content?.trim()) { showToast("Please write something in this section first.", "error"); return; }
-  streamToAiBox("/api/improve", { sectionTitle: title, content }, id, "✨ Improved Text", true);
+  const topic = getTopic();
+  const pubmedContext = getSelectedPubmedContext();
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext }, id, "✨ Improved Text", true);
 }
 
 function getKeyPoints(id, title) {
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title }, id, "💡 Key Points to Cover", false);
+  const topic = getTopic();
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic }, id, "💡 Key Points to Cover", false);
 }
 
 function applyAiSuggestion(id) {
@@ -507,6 +563,7 @@ function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
     localStorage.setItem("mm-article", JSON.stringify({
+      topic: document.getElementById("medical-topic").value,
       title: document.getElementById("article-title").value,
       authors: document.getElementById("authors").value,
       keywords: document.getElementById("keywords").value,
@@ -520,6 +577,7 @@ function loadFromStorage() {
     const saved = localStorage.getItem("mm-article");
     if (!saved) return;
     const data = JSON.parse(saved);
+    if (data.topic) document.getElementById("medical-topic").value = data.topic;
     if (data.title) document.getElementById("article-title").value = data.title;
     if (data.authors) document.getElementById("authors").value = data.authors;
     if (data.keywords) document.getElementById("keywords").value = data.keywords;
@@ -538,6 +596,7 @@ function loadFromStorage() {
 // ── Clear all ──
 function clearAll() {
   if (!confirm("Clear all article content? This cannot be undone.")) return;
+  document.getElementById("medical-topic").value = "";
   document.getElementById("article-title").value = "";
   document.getElementById("authors").value = "";
   document.getElementById("keywords").value = "";
@@ -552,6 +611,109 @@ function clearAll() {
   updatePreview();
   localStorage.removeItem("mm-article");
   showToast("Cleared.", "success");
+}
+
+// ── PubMed search ──
+let pubmedArticles = [];
+
+async function searchPubMed() {
+  const queryEl = document.getElementById("pubmed-query");
+  const topic = getTopic();
+  const query = queryEl.value.trim() || topic;
+  if (!query) { showToast("Enter a search query or set a Medical Topic first.", "error"); return; }
+
+  const btn = document.getElementById("pubmed-btn");
+  const resultsEl = document.getElementById("pubmed-results");
+  btn.disabled = true;
+  btn.textContent = "Searching...";
+  resultsEl.innerHTML = `<div class="pubmed-empty">Searching PubMed...</div>`;
+
+  try {
+    const resp = await fetch("/api/pubmed-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, maxResults: 10 }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const data = await resp.json();
+    pubmedArticles = data.articles || [];
+    renderPubmedResults();
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="pubmed-empty" style="color:#ef4444">Error: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Search";
+  }
+}
+
+function renderPubmedResults() {
+  const el = document.getElementById("pubmed-results");
+  if (!pubmedArticles.length) {
+    el.innerHTML = `<div class="pubmed-empty">No results found.</div>`;
+    return;
+  }
+  el.innerHTML = pubmedArticles.map((a, i) => `
+    <div class="pubmed-article" id="pm-${i}">
+      <div class="pubmed-article-title">${htmlEsc(a.title)}</div>
+      <div class="pubmed-article-meta">${htmlEsc(a.authors)} &bull; ${htmlEsc(a.journal)} ${htmlEsc(a.year)} &bull; PMID: ${htmlEsc(a.pmid)}</div>
+      <div class="pubmed-article-abstract" id="pm-abs-${i}">${htmlEsc(a.abstract || "No abstract available.")}</div>
+      ${(a.abstract && a.abstract.length > 200) ? `<span class="pubmed-expand" onclick="toggleAbstract(${i})">Show more</span>` : ""}
+      <div>
+        <button class="btn btn-pubmed btn-sm pubmed-use-btn" onclick="insertReference(${i})">+ Add to References</button>
+        <button class="btn btn-outline btn-sm pubmed-use-btn" onclick="togglePubmedSelect(${i})" id="pm-sel-${i}">Use in AI</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function toggleAbstract(i) {
+  const el = document.getElementById(`pm-abs-${i}`);
+  const isExpanded = el.classList.toggle("expanded");
+  el.nextElementSibling.textContent = isExpanded ? "Show less" : "Show more";
+}
+
+const selectedPubmed = new Set();
+
+function togglePubmedSelect(i) {
+  const btn = document.getElementById(`pm-sel-${i}`);
+  if (selectedPubmed.has(i)) {
+    selectedPubmed.delete(i);
+    btn.textContent = "Use in AI";
+    btn.classList.remove("btn-ai");
+    btn.classList.add("btn-outline");
+  } else {
+    selectedPubmed.add(i);
+    btn.textContent = "✓ Using in AI";
+    btn.classList.remove("btn-outline");
+    btn.classList.add("btn-ai");
+  }
+}
+
+function getSelectedPubmedContext() {
+  if (!selectedPubmed.size) return "";
+  return [...selectedPubmed].map(i => {
+    const a = pubmedArticles[i];
+    if (!a) return "";
+    return `Title: ${a.title}\nAuthors: ${a.authors}\nJournal: ${a.journal} (${a.year})\nAbstract: ${a.abstract || "N/A"}`;
+  }).filter(Boolean).join("\n\n---\n\n");
+}
+
+function insertReference(i) {
+  const a = pubmedArticles[i];
+  if (!a) return;
+  const ref = `${a.authors}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}.`;
+  const current = state.sections["references"] || "";
+  const lines = current.trim().split("\n").filter(l => l.trim());
+  const num = lines.length + 1;
+  const newContent = current.trim() ? `${current.trim()}\n${num}. ${ref}` : `1. ${ref}`;
+  state.sections["references"] = newContent;
+  const el = document.getElementById("content-references");
+  if (el) el.value = newContent;
+  updateWordCount("references");
+  updateTotalWordCount();
+  updatePreview();
+  scheduleAutoSave();
+  showToast("Reference added!", "success");
 }
 
 // ── Toast ──
