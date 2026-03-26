@@ -469,43 +469,33 @@ app.post("/api/fetch-pmids", async (req, res) => {
     const foundPmids = new Set(foundArticles.map((a) => a.pmid));
     const notFound = validPmids.filter((id) => !foundPmids.has(id));
 
-    // Step 3: For each found article, check PMC OA availability
-    const articles = [];
-    for (const article of foundArticles) {
+    // Step 3: Enrich each article with PMC OA info — parallel, max 3 concurrent
+    async function enrichArticle(article) {
       let pmcid = null;
       let isOA = false;
       let fullText = null;
 
       try {
-        // Rate limit: 350ms between elink calls
-        await new Promise((r) => setTimeout(r, 350));
-
         const elinkUrl =
           `${NCBI_BASE}/elink.fcgi?dbfrom=pubmed&db=pmc&id=${article.pmid}&retmode=json${keyParam}`;
         const elinkResp = await fetchWithRetry(elinkUrl);
         if (elinkResp.ok) {
           const elinkData = await elinkResp.json();
-          const linksets = elinkData?.linksets || [];
-          const links = linksets[0]?.linksetdbs?.find((db) => db.dbto === "pmc")?.links || [];
-          if (links.length > 0) {
-            pmcid = String(links[0]);
-          }
+          const links = elinkData?.linksets?.[0]?.linksetdbs?.find((db) => db.dbto === "pmc")?.links || [];
+          if (links.length > 0) pmcid = String(links[0]);
         }
       } catch (err) {
         console.error(`elink error for PMID ${article.pmid}:`, err.message);
       }
 
       if (pmcid) {
-        // Step 4: Check OA package info
         try {
           const oaUrl = `https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id=PMC${pmcid}`;
           const oaResp = await fetchWithRetry(oaUrl);
           if (oaResp.ok) {
             const oaXml = await oaResp.text();
-            // Look for tgz link to confirm OA
-            if (/<link[^>]+format="tgz"[^>]+href="[^"]+"/i.test(oaXml)) {
-              isOA = true;
-            } else if (/<link[^>]+format="pdf"[^>]+href="[^"]+"/i.test(oaXml)) {
+            if (/<link[^>]+format="tgz"[^>]+href="[^"]+"/i.test(oaXml) ||
+                /<link[^>]+format="pdf"[^>]+href="[^"]+"/i.test(oaXml)) {
               isOA = true;
             }
           }
@@ -513,7 +503,6 @@ app.post("/api/fetch-pmids", async (req, res) => {
           console.error(`OA check error for PMC${pmcid}:`, err.message);
         }
 
-        // Step 5: Fetch BioC JSON full text for OA articles
         if (isOA) {
           try {
             const biocUrl = `https://www.ncbi.nlm.nih.gov/research/biolinkml/api/text?pmcids=PMC${pmcid}&format=bioc`;
@@ -522,17 +511,13 @@ app.post("/api/fetch-pmids", async (req, res) => {
               const biocData = await biocResp.json();
               const targetSections = new Set(["INTRO", "RESULTS", "DISCUSS", "CONCL", "ABSTRACT"]);
               const passages = [];
-              const docs = biocData?.documents || biocData?.PubTator3 || [];
-              for (const doc of docs) {
+              for (const doc of (biocData?.documents || biocData?.PubTator3 || [])) {
                 for (const passage of doc.passages || []) {
-                  const sectionType = passage?.infons?.section_type || passage?.infons?.type || "";
-                  if (targetSections.has(sectionType.toUpperCase())) {
-                    passages.push(passage.text || "");
-                  }
+                  const st = (passage?.infons?.section_type || passage?.infons?.type || "").toUpperCase();
+                  if (targetSections.has(st)) passages.push(passage.text || "");
                 }
               }
-              const combined = passages.join(" ").trim();
-              fullText = combined.slice(0, 6000) || null;
+              fullText = passages.join(" ").trim().slice(0, 6000) || null;
             }
           } catch (err) {
             console.error(`BioC fetch error for PMC${pmcid}:`, err.message);
@@ -540,12 +525,25 @@ app.post("/api/fetch-pmids", async (req, res) => {
         }
       }
 
-      articles.push({
-        ...article,
-        pmcid: pmcid ? `PMC${pmcid}` : null,
-        isOA,
-        fullText,
-      });
+      return { ...article, pmcid: pmcid ? `PMC${pmcid}` : null, isOA, fullText };
+    }
+
+    // Run enrichment with concurrency limit of 3
+    const CONCURRENCY = 3;
+    const articles = [];
+    for (let i = 0; i < foundArticles.length; i += CONCURRENCY) {
+      const batch = foundArticles.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(batch.map(enrichArticle));
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === "fulfilled") {
+          articles.push(results[j].value);
+        } else {
+          // Enrichment failed — fall back to base article data
+          articles.push({ ...foundArticles[i + j], pmcid: null, isOA: false, fullText: null });
+        }
+      }
+      // Small inter-batch pause to stay within NCBI rate limit
+      if (i + CONCURRENCY < foundArticles.length) await new Promise((r) => setTimeout(r, 400));
     }
 
     res.json({ found: articles, notFound });
