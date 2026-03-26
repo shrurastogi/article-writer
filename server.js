@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const OpenAI = require("openai");
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require("docx");
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType } = require("docx");
 
 const app = express();
 const PORT = 3000;
@@ -280,6 +280,23 @@ function parsePubMedXML(xml) {
   return articles;
 }
 
+// Parse HTML table into headers and rows
+function parseTableHTML(html) {
+  const headers = [...(html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi))]
+    .map(m => m[1].replace(/<[^>]+>/g, "").trim());
+  const rows = [];
+  const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  if (tbodyMatch) {
+    const rowMatches = [...tbodyMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+    for (const rm of rowMatches) {
+      const cells = [...rm[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
+        .map(m => m[1].replace(/<[^>]+>/g, "").trim());
+      if (cells.length) rows.push(cells);
+    }
+  }
+  return { headers, rows };
+}
+
 // Export as Word DOCX
 app.post("/api/export-docx", async (req, res) => {
   const { title, authors, keywords, sections } = req.body;
@@ -322,7 +339,8 @@ app.post("/api/export-docx", async (req, res) => {
 
     // Sections
     for (const section of sections) {
-      if (!section.content?.trim()) continue;
+      const sectionText = section.prose ?? section.content ?? "";
+      if (!sectionText.trim() && !(section.tables?.length)) continue;
 
       children.push(
         new Paragraph({
@@ -332,7 +350,7 @@ app.post("/api/export-docx", async (req, res) => {
         })
       );
 
-      const paragraphs = section.content.split(/\n\n+/).filter((p) => p.trim());
+      const paragraphs = sectionText.split(/\n\n+/).filter((p) => p.trim());
       for (const para of paragraphs) {
         const lines = para.split(/\n/).filter((l) => l.trim());
         for (const line of lines) {
@@ -343,6 +361,40 @@ app.post("/api/export-docx", async (req, res) => {
             })
           );
         }
+      }
+
+      // Render tables for this section
+      for (const tableEntry of section.tables || []) {
+        const { headers, rows } = parseTableHTML(tableEntry.html || "");
+        if (!headers.length) continue;
+
+        // Caption as italic paragraph
+        if (tableEntry.caption) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: tableEntry.caption, italics: true, size: 20 })],
+            spacing: { before: 200, after: 80 },
+          }));
+        }
+
+        // Build docx Table
+        const allCols = Math.max(headers.length, ...rows.map(r => r.length));
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              tableHeader: true,
+              children: headers.map(h => new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 18 })] })],
+              })),
+            }),
+            ...rows.map(row => new TableRow({
+              children: Array.from({ length: allCols }, (_, ci) => new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: row[ci] || "", size: 18 })] })],
+              })),
+            })),
+          ],
+        }));
+        children.push(new Paragraph({ spacing: { after: 160 } }));
       }
     }
 
@@ -367,6 +419,247 @@ app.post("/api/export-docx", async (req, res) => {
   } catch (err) {
     console.error("DOCX export error:", err.message);
     res.status(500).json({ error: "Failed to generate DOCX: " + err.message });
+  }
+});
+
+// Helper: fetch with retry on network errors
+async function fetchWithRetry(url, maxRetries = 2) {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const resp = await fetch(url);
+      return resp;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// Fetch PubMed articles by PMID list, with PMC OA full-text if available
+app.post("/api/fetch-pmids", async (req, res) => {
+  const { pmids } = req.body;
+
+  if (!Array.isArray(pmids) || pmids.length === 0) {
+    return res.status(400).json({ error: "pmids must be a non-empty array." });
+  }
+
+  // Validate: numeric strings only, deduplicate, max 50
+  const validPmids = [...new Set(pmids.filter((id) => /^\d+$/.test(String(id).trim())).map(String))].slice(0, 50);
+
+  if (validPmids.length === 0) {
+    return res.status(400).json({ error: "No valid numeric PMIDs provided." });
+  }
+
+  try {
+    const keyParam = NCBI_API_KEY ? `&api_key=${NCBI_API_KEY}` : "";
+
+    // Step 1: Batch-fetch PubMed metadata
+    const fetchUrl =
+      `${NCBI_BASE}/efetch.fcgi?db=pubmed&id=${validPmids.join(",")}&rettype=abstract&retmode=xml${keyParam}`;
+    const fetchResp = await fetchWithRetry(fetchUrl);
+    if (!fetchResp.ok) throw new Error(`PubMed efetch HTTP ${fetchResp.status}`);
+    const xml = await fetchResp.text();
+
+    // Step 2: Parse with existing helper
+    const foundArticles = parsePubMedXML(xml);
+    const foundPmids = new Set(foundArticles.map((a) => a.pmid));
+    const notFound = validPmids.filter((id) => !foundPmids.has(id));
+
+    // Step 3: For each found article, check PMC OA availability
+    const articles = [];
+    for (const article of foundArticles) {
+      let pmcid = null;
+      let isOA = false;
+      let fullText = null;
+
+      try {
+        // Rate limit: 350ms between elink calls
+        await new Promise((r) => setTimeout(r, 350));
+
+        const elinkUrl =
+          `${NCBI_BASE}/elink.fcgi?dbfrom=pubmed&db=pmc&id=${article.pmid}&retmode=json${keyParam}`;
+        const elinkResp = await fetchWithRetry(elinkUrl);
+        if (elinkResp.ok) {
+          const elinkData = await elinkResp.json();
+          const linksets = elinkData?.linksets || [];
+          const links = linksets[0]?.linksetdbs?.find((db) => db.dbto === "pmc")?.links || [];
+          if (links.length > 0) {
+            pmcid = String(links[0]);
+          }
+        }
+      } catch (err) {
+        console.error(`elink error for PMID ${article.pmid}:`, err.message);
+      }
+
+      if (pmcid) {
+        // Step 4: Check OA package info
+        try {
+          const oaUrl = `https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id=PMC${pmcid}`;
+          const oaResp = await fetchWithRetry(oaUrl);
+          if (oaResp.ok) {
+            const oaXml = await oaResp.text();
+            // Look for tgz link to confirm OA
+            if (/<link[^>]+format="tgz"[^>]+href="[^"]+"/i.test(oaXml)) {
+              isOA = true;
+            } else if (/<link[^>]+format="pdf"[^>]+href="[^"]+"/i.test(oaXml)) {
+              isOA = true;
+            }
+          }
+        } catch (err) {
+          console.error(`OA check error for PMC${pmcid}:`, err.message);
+        }
+
+        // Step 5: Fetch BioC JSON full text for OA articles
+        if (isOA) {
+          try {
+            const biocUrl = `https://www.ncbi.nlm.nih.gov/research/biolinkml/api/text?pmcids=PMC${pmcid}&format=bioc`;
+            const biocResp = await fetchWithRetry(biocUrl);
+            if (biocResp.ok) {
+              const biocData = await biocResp.json();
+              const targetSections = new Set(["INTRO", "RESULTS", "DISCUSS", "CONCL", "ABSTRACT"]);
+              const passages = [];
+              const docs = biocData?.documents || biocData?.PubTator3 || [];
+              for (const doc of docs) {
+                for (const passage of doc.passages || []) {
+                  const sectionType = passage?.infons?.section_type || passage?.infons?.type || "";
+                  if (targetSections.has(sectionType.toUpperCase())) {
+                    passages.push(passage.text || "");
+                  }
+                }
+              }
+              const combined = passages.join(" ").trim();
+              fullText = combined.slice(0, 6000) || null;
+            }
+          } catch (err) {
+            console.error(`BioC fetch error for PMC${pmcid}:`, err.message);
+          }
+        }
+      }
+
+      articles.push({
+        ...article,
+        pmcid: pmcid ? `PMC${pmcid}` : null,
+        isOA,
+        fullText,
+      });
+    }
+
+    res.json({ found: articles, notFound });
+  } catch (err) {
+    console.error("fetch-pmids error:", err.message);
+    res.status(500).json({ error: "Failed to fetch PMIDs: " + err.message });
+  }
+});
+
+// Generate an HTML table for a section
+app.post("/api/generate-table", async (req, res) => {
+  const { topic, sectionTitle, tableDescription, pubmedContext } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+  if (!tableDescription?.trim()) {
+    return res.status(400).json({ error: "A table description is required." });
+  }
+
+  const litText = pubmedContext?.trim()
+    ? `\nPubMed context (use data from these abstracts where possible):\n${pubmedContext}`
+    : "";
+
+  const prompt = `You are an expert medical writer creating a publication-quality data table.
+
+Section: ${sectionTitle} in a review article on ${topic}
+Table request: ${tableDescription}${litText}
+
+Generate an HTML table that:
+- Has a <caption> element as the first child with a descriptive title (e.g. "Table 1: Comparison of CAR-T Cell Therapies in Multiple Myeloma")
+- Uses <thead> with <th> header cells (bold)
+- Uses <tbody> with <tr>/<td> data cells
+- Has a maximum of 7 columns; prefer fewer columns with richer cell content
+- Uses data from the provided abstracts/context where possible; mark uncertain values as "NR" (not reported)
+- Returns ONLY the <table>...</table> HTML — no surrounding text, no markdown, no explanation
+
+Example structure:
+<table>
+  <caption>Table 1: ...</caption>
+  <thead><tr><th>Col1</th><th>Col2</th></tr></thead>
+  <tbody><tr><td>val</td><td>val</td></tr></tbody>
+</table>`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await client.chat.completions.create({
+      model: MODEL,
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    console.error("Groq API error:", err.message);
+    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+  }
+});
+
+// Refine an existing draft section with a user instruction
+app.post("/api/refine", async (req, res) => {
+  const { topic, sectionTitle, currentDraft, instruction, pubmedContext } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+  if (!currentDraft?.trim()) {
+    return res.status(400).json({ error: "No current draft provided." });
+  }
+  if (!instruction?.trim()) {
+    return res.status(400).json({ error: "No refinement instruction provided." });
+  }
+
+  const litText = pubmedContext?.trim()
+    ? `\n\n${pubmedContext}`
+    : "";
+
+  const prompt = `You are an expert medical writer specializing in ${topic}.
+The user has a draft of the "${sectionTitle}" section and wants to refine it with the following instruction:
+
+Instruction: ${instruction}
+
+Current draft:
+${currentDraft}${litText}
+
+Apply the instruction precisely. Preserve content not targeted by the instruction.
+Return ONLY the refined section text — no heading, no preamble, no explanation.`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await client.chat.completions.create({
+      model: MODEL,
+      max_tokens: 1800,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    console.error("Groq API error:", err.message);
+    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
 
