@@ -177,6 +177,57 @@
     .toast.show { transform: translateY(0); opacity: 1; }
     .toast.success { background: #15803d; }
     .toast.error { background: #dc2626; }
+
+    /* ── Reference Library ── */
+    .reflib-toggle-btn { background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--muted); padding: 0; }
+    .reflib-item { background: #fff; border: 1px solid #86efac; border-radius: 6px; padding: 8px 10px; font-size: 0.79rem; display: flex; gap: 8px; align-items: flex-start; }
+    .reflib-num { background: #16a34a; color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+    .reflib-oa { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 4px; padding: 1px 5px; font-size: 0.66rem; font-weight: 700; white-space: nowrap; vertical-align: middle; }
+    .reflib-title { font-weight: 600; color: #15803d; line-height: 1.3; margin-bottom: 2px; }
+    .reflib-meta { color: var(--muted); font-size: 0.72rem; }
+    .reflib-actions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .reflib-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .reflib-empty { color: var(--muted); font-size: 0.82rem; text-align: center; padding: 12px 0; }
+
+    /* ── Section header icon buttons ── */
+    .btn-icon { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.82rem; padding: 2px 5px; border-radius: 4px; line-height: 1; }
+    .btn-icon:hover { background: var(--bg); color: var(--text); }
+
+    /* ── Table generation ── */
+    .section-tables { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .table-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .table-card-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    .table-caption { font-weight: 600; color: var(--secondary); font-size: 0.78rem; }
+    .table-html-preview { overflow-x: auto; padding: 8px; }
+    .table-html-preview table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .table-html-preview th { background: #f1f5f9; font-weight: 600; padding: 5px 8px; border: 1px solid var(--border); text-align: left; }
+    .table-html-preview td { padding: 4px 8px; border: 1px solid var(--border); vertical-align: top; }
+    .table-html-preview caption { font-style: italic; font-size: 0.74rem; margin-bottom: 4px; text-align: left; color: var(--secondary); }
+
+    /* ── Refine row ── */
+    .refine-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+    .refine-input { flex: 1; padding: 6px 10px; border: 1px solid var(--ai-border); border-radius: 6px; font-size: 0.8rem; font-family: inherit; background: var(--ai-light); }
+    .refine-input:focus { outline: none; border-color: var(--ai); }
+    .ai-box-content[contenteditable="true"] { cursor: text; border: 1px dashed var(--ai-border); border-radius: 4px; padding: 4px; min-height: 40px; }
+    .ai-box-content[contenteditable="true"]:focus { outline: none; border-color: var(--ai); border-style: solid; }
+
+    /* ── Citations in preview ── */
+    .cite-link { color: var(--primary); font-size: 0.75em; font-weight: 700; cursor: help; vertical-align: super; }
+    .cite-unmatched { color: #d97706; border-bottom: 1px dashed #d97706; cursor: help; }
+
+    /* ── Preview tables ── */
+    .p-table-wrap { margin: 12px 0; overflow-x: auto; page-break-inside: avoid; }
+    .p-table-wrap table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    .p-table-wrap th { background: #f1f5f9; font-weight: 700; padding: 6px 10px; border: 1px solid #ccc; text-align: left; }
+    .p-table-wrap td { padding: 5px 10px; border: 1px solid #ccc; vertical-align: top; }
+    .p-table-wrap caption { font-style: italic; font-size: 9pt; margin-bottom: 4px; text-align: left; caption-side: top; }
+
+    /* ── Modals ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 460px; max-width: 92vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -219,6 +270,30 @@
       </div>
     </div>
 
+    <!-- Reference Library -->
+    <div class="panel" style="margin-bottom:12px;border-color:#86efac">
+      <div class="panel-header" style="cursor:pointer;background:#f0fdf4" onclick="toggleRefLib()">
+        <span class="panel-title" style="color:#15803d">Reference Library</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="reflib-count" style="font-size:0.78rem;color:var(--muted)">0 references</span>
+          <span id="reflib-chevron" style="font-size:0.65rem;color:var(--muted);transition:transform 0.2s">▶</span>
+        </div>
+      </div>
+      <div id="reflib-body" style="display:none;padding:14px 18px">
+        <label>Paste PMIDs <span style="font-weight:400;color:var(--muted)">(comma or newline separated)</span></label>
+        <textarea id="pmid-input" rows="3" placeholder="e.g. 36924986, 35551128&#10;37208067" style="margin-bottom:8px"></textarea>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="fetchPmids()" id="fetch-pmids-btn">Fetch References</button>
+          <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(true)">Select All</button>
+          <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(false)">Deselect All</button>
+          <button class="btn btn-secondary btn-sm" onclick="syncReferencesSection()">↺ Sync References</button>
+        </div>
+        <div id="reflib-list" class="reflib-list">
+          <div class="reflib-empty">No references yet. Paste PMIDs above or add from PubMed search results.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- PubMed search -->
     <div class="panel" style="margin-bottom:12px">
       <div class="panel-header">
@@ -238,6 +313,9 @@
 
     <!-- Article sections (accordion) -->
     <div id="sections-container"></div>
+    <div style="text-align:center;margin:10px 0 4px">
+      <button class="btn btn-outline" onclick="openAddSectionModal()">+ Add Section</button>
+    </div>
 
   </div>
 
@@ -258,40 +336,84 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Add Section Modal -->
+<div class="modal-overlay" id="add-section-modal">
+  <div class="modal-box">
+    <div class="modal-title">Add Custom Section</div>
+    <div class="form-group">
+      <label>Section Title</label>
+      <input type="text" id="new-section-title" placeholder="e.g. Biomarkers &amp; Liquid Biopsy" onkeydown="if(event.key==='Enter')confirmAddSection()" />
+    </div>
+    <div class="form-group">
+      <label>Insert after</label>
+      <select id="new-section-position"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ai" onclick="confirmAddSection()">Add Section</button>
+      <button class="btn btn-secondary" onclick="closeAddSectionModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table Generation Modal -->
+<div class="modal-overlay" id="table-modal">
+  <div class="modal-box">
+    <div class="modal-title">Add Table — <span id="table-modal-section-name"></span></div>
+    <div class="form-group">
+      <label>Describe the table</label>
+      <textarea id="table-description" rows="3" placeholder="e.g. Comparison of CAR-T cell therapies: product, trial, ORR, PFS, key toxicities"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ai" id="table-gen-btn" onclick="generateTable()">Generate Table</button>
+      <button class="btn btn-secondary" onclick="closeTableModal()">Cancel</button>
+    </div>
+    <div id="table-gen-status" style="margin-top:8px;font-size:0.82rem;color:var(--ai);font-style:italic;display:none">Generating table...</div>
+  </div>
+</div>
+
 <script>
 // ── Section definitions ──
-const SECTIONS = [
-  { id: "abstract",         num: "",    title: "Abstract",                              placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)..." },
-  { id: "introduction",     num: "1",   title: "Introduction",                          placeholder: "Disease background, clinical burden, rationale for the review..." },
-  { id: "epidemiology",     num: "2",   title: "Epidemiology & Risk Factors",           placeholder: "Incidence, prevalence, demographic trends, risk factors..." },
-  { id: "pathophysiology",  num: "3",   title: "Pathophysiology & Molecular Biology",   placeholder: "Clonal plasma cell proliferation, genetic alterations, tumor microenvironment..." },
-  { id: "diagnosis",        num: "4",   title: "Clinical Presentation & Diagnosis",     placeholder: "CRAB/SLiM-CRAB criteria, diagnostic workup, imaging..." },
-  { id: "staging",          num: "5",   title: "Staging & Risk Stratification",         placeholder: "ISS, R-ISS, cytogenetic risk categories..." },
-  { id: "treatment_nd",     num: "6",   title: "Treatment: Newly Diagnosed MM",         placeholder: "Transplant-eligible vs ineligible pathways, induction, ASCT, maintenance..." },
-  { id: "treatment_rr",     num: "7",   title: "Treatment: Relapsed/Refractory MM",     placeholder: "Salvage regimens, drug sequencing, landmark trials..." },
-  { id: "novel_therapies",  num: "8",   title: "Novel Therapies & Emerging Treatments", placeholder: "CAR-T cells, bispecific antibodies, novel targets, ADCs..." },
-  { id: "supportive_care",  num: "9",   title: "Supportive Care & Complications",       placeholder: "Bone disease, renal failure, infections, VTE, anemia management..." },
-  { id: "future_directions",num: "10",  title: "Future Directions",                     placeholder: "MRD-guided therapy, ongoing trials, research priorities..." },
-  { id: "conclusion",       num: "11",  title: "Conclusion",                            placeholder: "Summary of advances, remaining challenges, clinical implications..." },
-  { id: "references",       num: "",    title: "References",                            placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ..." },
+let SECTIONS = [
+  { id: "abstract",         num: "",    title: "Abstract",                              placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)...",  isCustom: false },
+  { id: "introduction",     num: "1",   title: "Introduction",                          placeholder: "Disease background, clinical burden, rationale for the review...",               isCustom: false },
+  { id: "epidemiology",     num: "2",   title: "Epidemiology & Risk Factors",           placeholder: "Incidence, prevalence, demographic trends, risk factors...",                    isCustom: false },
+  { id: "pathophysiology",  num: "3",   title: "Pathophysiology & Molecular Biology",   placeholder: "Clonal plasma cell proliferation, genetic alterations, tumor microenvironment...", isCustom: false },
+  { id: "diagnosis",        num: "4",   title: "Clinical Presentation & Diagnosis",     placeholder: "CRAB/SLiM-CRAB criteria, diagnostic workup, imaging...",                       isCustom: false },
+  { id: "staging",          num: "5",   title: "Staging & Risk Stratification",         placeholder: "ISS, R-ISS, cytogenetic risk categories...",                                    isCustom: false },
+  { id: "treatment_nd",     num: "6",   title: "Treatment: Newly Diagnosed MM",         placeholder: "Transplant-eligible vs ineligible pathways, induction, ASCT, maintenance...",  isCustom: false },
+  { id: "treatment_rr",     num: "7",   title: "Treatment: Relapsed/Refractory MM",     placeholder: "Salvage regimens, drug sequencing, landmark trials...",                         isCustom: false },
+  { id: "novel_therapies",  num: "8",   title: "Novel Therapies & Emerging Treatments", placeholder: "CAR-T cells, bispecific antibodies, novel targets, ADCs...",                   isCustom: false },
+  { id: "supportive_care",  num: "9",   title: "Supportive Care & Complications",       placeholder: "Bone disease, renal failure, infections, VTE, anemia management...",            isCustom: false },
+  { id: "future_directions",num: "10",  title: "Future Directions",                     placeholder: "MRD-guided therapy, ongoing trials, research priorities...",                    isCustom: false },
+  { id: "conclusion",       num: "11",  title: "Conclusion",                            placeholder: "Summary of advances, remaining challenges, clinical implications...",           isCustom: false },
+  { id: "references",       num: "",    title: "References",                            placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ...",                  isCustom: false },
 ];
 
 // ── State ──
 const state = {
-  sections: Object.fromEntries(SECTIONS.map(s => [s.id, ""])),
+  sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [] }])),
+  library: [],  // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, refNumber, selected }]
 };
 
+const refinementHistory = {};  // { [sectionId]: string[] }
+let tableModalSectionId = null;
 let autoSaveTimer = null;
 
 // ── Init ──
-renderSections();
 loadFromStorage();
+renderSections();
 updatePreview();
 
 // ── Render accordion sections ──
 function renderSections() {
   const container = document.getElementById("sections-container");
-  container.innerHTML = SECTIONS.map(s => `
+  // Ensure state exists for every section
+  SECTIONS.forEach(s => {
+    if (!state.sections[s.id]) state.sections[s.id] = { prose: "", tables: [] };
+  });
+  container.innerHTML = SECTIONS.map(s => {
+    const titleEsc = s.title.replace(/'/g, "\\'");
+    return `
     <div class="section-panel" id="section-${s.id}">
       <div class="section-head" onclick="toggleSection('${s.id}')">
         <div class="section-head-left">
@@ -299,13 +421,17 @@ function renderSections() {
           ${s.num ? `<span class="section-num">${s.num}.</span>` : ""}
           <span class="section-name">${s.title}</span>
         </div>
-        <span class="section-wc" id="wc-${s.id}">0 words</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="section-wc" id="wc-${s.id}">0 words</span>
+          ${s.isCustom ? `<button class="btn-icon" title="Rename" onclick="event.stopPropagation();renameSection('${s.id}')">✎</button>` : ""}
+          <button class="btn-icon" title="Delete section" onclick="event.stopPropagation();deleteSection('${s.id}')">✕</button>
+        </div>
       </div>
       <div class="section-body" id="body-${s.id}">
         <textarea
           id="content-${s.id}"
           rows="9"
-          placeholder="${s.placeholder}"
+          placeholder="${s.placeholder.replace(/"/g, '&quot;')}"
           oninput="updateSection('${s.id}', this.value)"
           style="margin-bottom:8px"
         ></textarea>
@@ -313,28 +439,46 @@ function renderSections() {
           type="text"
           id="notes-${s.id}"
           class="notes-input"
-          placeholder="✏️ Notes / hints for AI generation (optional) — e.g. 'focus on CAR-T and bispecifics post 2022'"
+          placeholder="✏️ Notes / hints for AI generation (optional)"
           onclick="event.stopPropagation()"
         />
         <div class="section-ai-actions">
-          <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${s.title}')">✨ Generate Draft</button>
-          <button class="btn btn-ai btn-sm" onclick="improveSection('${s.id}','${s.title}')">✨ Improve</button>
-          <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${s.title}')">💡 Key Points</button>
+          <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${titleEsc}')">✨ Generate Draft</button>
+          <button class="btn btn-ai btn-sm" onclick="improveSection('${s.id}','${titleEsc}')">✨ Improve</button>
+          <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${titleEsc}')">💡 Key Points</button>
+          <button class="btn btn-outline btn-sm" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
         </div>
         <div class="ai-box" id="ai-${s.id}">
           <div class="ai-box-header">
             <span id="ai-label-${s.id}">✨ AI Suggestion</span>
-            <button class="btn btn-secondary btn-sm" onclick="closeAiBox('${s.id}')">✕</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" id="ai-undo-${s.id}" style="display:none" onclick="undoRefinement('${s.id}')">↩ Undo</button>
+              <button class="btn btn-secondary btn-sm" onclick="closeAiBox('${s.id}')">✕</button>
+            </div>
           </div>
-          <div class="ai-box-content" id="ai-content-${s.id}"></div>
+          <div class="ai-box-content" id="ai-content-${s.id}" contenteditable="false"></div>
+          <div class="refine-row" id="refine-row-${s.id}" style="display:none">
+            <input type="text" id="refine-input-${s.id}" class="refine-input"
+              placeholder="Refine: 'make concise', 'add statistics', 'focus on CAR-T post 2022'..."
+              onkeydown="if(event.key==='Enter')refineSection('${s.id}','${titleEsc}')" />
+            <button class="btn btn-outline btn-sm" onclick="refineSection('${s.id}','${titleEsc}')">↺ Refine</button>
+          </div>
           <div class="ai-box-actions" id="ai-actions-${s.id}">
             <button class="btn btn-ai btn-sm" onclick="applyAiSuggestion('${s.id}')">Apply</button>
             <button class="btn btn-secondary btn-sm" onclick="closeAiBox('${s.id}')">Dismiss</button>
           </div>
         </div>
+        <div id="tables-${s.id}" class="section-tables"></div>
       </div>
     </div>
-  `).join("");
+  `}).join("");
+  // Re-populate textarea values from state
+  SECTIONS.forEach(s => {
+    const el = document.getElementById(`content-${s.id}`);
+    if (el) el.value = state.sections[s.id]?.prose || "";
+    updateWordCount(s.id);
+    renderSectionTables(s.id);
+  });
 }
 
 // ── Accordion toggle ──
@@ -349,7 +493,8 @@ function openSection(id) {
 
 // ── State updates ──
 function updateSection(id, value) {
-  state.sections[id] = value;
+  if (!state.sections[id]) state.sections[id] = { prose: "", tables: [] };
+  state.sections[id].prose = value;
   updateWordCount(id);
   updateTotalWordCount();
   updatePreview();
@@ -367,12 +512,13 @@ function wordCount(text) {
 }
 
 function updateWordCount(id) {
-  const wc = wordCount(state.sections[id] || "");
-  document.getElementById(`wc-${id}`).textContent = `${wc} words`;
+  const wc = wordCount(state.sections[id]?.prose || "");
+  const el = document.getElementById(`wc-${id}`);
+  if (el) el.textContent = `${wc} words`;
 }
 
 function updateTotalWordCount() {
-  const total = Object.values(state.sections).reduce((sum, t) => sum + wordCount(t), 0);
+  const total = Object.values(state.sections).reduce((sum, v) => sum + wordCount(typeof v === "string" ? v : v?.prose || ""), 0);
   const title = document.getElementById("article-title").value;
   const authors = document.getElementById("authors").value;
   const keywords = document.getElementById("keywords").value;
@@ -401,9 +547,9 @@ function updatePreview() {
   if (title) html += `<div class="p-title">${htmlEsc(title)}</div>`;
   if (authors) html += `<div class="p-authors">${htmlEsc(authors)}</div>`;
 
-  const abstract = state.sections["abstract"];
-  if (abstract) {
-    html += `<div class="p-abstract-box"><div class="p-abstract-label">Abstract</div><div class="p-body">${htmlEsc(abstract)}</div></div>`;
+  const abstractProse = state.sections["abstract"]?.prose || "";
+  if (abstractProse) {
+    html += `<div class="p-abstract-box"><div class="p-abstract-label">Abstract</div><div class="p-body">${enhanceCitations(abstractProse, state.library)}</div></div>`;
   }
 
   if (keywords) {
@@ -414,13 +560,19 @@ function updatePreview() {
   let num = 1;
   for (const s of SECTIONS) {
     if (s.id === "abstract") continue;
-    const content = state.sections[s.id];
-    if (!content?.trim()) continue;
+    const sec = state.sections[s.id];
+    const prose = typeof sec === "string" ? sec : sec?.prose || "";
+    const tables = typeof sec === "object" ? (sec?.tables || []) : [];
+    if (!prose.trim() && !tables.length) continue;
 
     if (s.id === "references") {
-      html += `<div class="p-section-title">References</div><div class="p-body">${htmlEsc(content)}</div>`;
+      html += `<div class="p-section-title">References</div><div class="p-body">${htmlEsc(prose)}</div>`;
     } else {
-      html += `<div class="p-section-title">${num}. ${htmlEsc(s.title)}</div><div class="p-body">${htmlEsc(content)}</div>`;
+      html += `<div class="p-section-title">${num}. ${htmlEsc(s.title)}</div>`;
+      if (prose.trim()) html += `<div class="p-body">${enhanceCitations(prose, state.library)}</div>`;
+      for (const t of tables) {
+        html += `<div class="p-table-wrap">${t.html || ""}</div>`;
+      }
       num++;
     }
   }
@@ -458,6 +610,12 @@ async function streamToAiBox(url, body, sectionId, label, canApply) {
       if (done) break;
       contentEl.textContent += decoder.decode(value, { stream: true });
     }
+    // Enable editing and show refine row after generation
+    if (canApply) {
+      contentEl.contentEditable = "true";
+      const refineRow = document.getElementById(`refine-row-${sectionId}`);
+      if (refineRow) refineRow.style.display = "flex";
+    }
   } catch (err) {
     contentEl.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
   }
@@ -489,7 +647,8 @@ function getKeyPoints(id, title) {
 }
 
 function applyAiSuggestion(id) {
-  const suggestion = document.getElementById(`ai-content-${id}`)?.textContent.trim();
+  const contentEl = document.getElementById(`ai-content-${id}`);
+  const suggestion = (contentEl?.innerText || contentEl?.textContent || "").trim();
   if (!suggestion) return;
   const textarea = document.getElementById(`content-${id}`);
   if (textarea) {
@@ -502,6 +661,13 @@ function applyAiSuggestion(id) {
 
 function closeAiBox(id) {
   document.getElementById(`ai-${id}`)?.classList.remove("visible");
+  const contentEl = document.getElementById(`ai-content-${id}`);
+  if (contentEl) contentEl.contentEditable = "false";
+  const refineRow = document.getElementById(`refine-row-${id}`);
+  if (refineRow) refineRow.style.display = "none";
+  const undoBtn = document.getElementById(`ai-undo-${id}`);
+  if (undoBtn) undoBtn.style.display = "none";
+  refinementHistory[id] = [];
 }
 
 // ── PDF export ──
@@ -533,7 +699,8 @@ async function downloadDOCX() {
   const sections = SECTIONS.map(s => ({
     id: s.id,
     title: s.num ? `${s.num}. ${s.title}` : s.title,
-    content: state.sections[s.id] || "",
+    prose: state.sections[s.id]?.prose || "",
+    tables: state.sections[s.id]?.tables || [],
   }));
 
   try {
@@ -568,6 +735,8 @@ function scheduleAutoSave() {
       authors: document.getElementById("authors").value,
       keywords: document.getElementById("keywords").value,
       sections: state.sections,
+      library: state.library,
+      customSections: SECTIONS.filter(s => s.isCustom),
     }));
   }, 1500);
 }
@@ -581,12 +750,24 @@ function loadFromStorage() {
     if (data.title) document.getElementById("article-title").value = data.title;
     if (data.authors) document.getElementById("authors").value = data.authors;
     if (data.keywords) document.getElementById("keywords").value = data.keywords;
-    if (data.sections) {
-      for (const [id, content] of Object.entries(data.sections)) {
-        state.sections[id] = content;
-        const el = document.getElementById(`content-${id}`);
-        if (el) el.value = content;
+    if (data.customSections?.length) {
+      const refIdx = SECTIONS.findIndex(s => s.id === "references");
+      for (const cs of data.customSections) {
+        if (!SECTIONS.find(s => s.id === cs.id)) {
+          SECTIONS.splice(refIdx, 0, cs);
+        }
       }
+    }
+    if (data.sections) {
+      for (const [id, val] of Object.entries(data.sections)) {
+        state.sections[id] = typeof val === "string" ? { prose: val, tables: [] } : (val || { prose: "", tables: [] });
+        const el = document.getElementById(`content-${id}`);
+        if (el) el.value = state.sections[id].prose || "";
+      }
+    }
+    if (data.library?.length) {
+      state.library = data.library;
+      renderLibrary();
     }
     SECTIONS.forEach(s => updateWordCount(s.id));
     updateTotalWordCount();
@@ -600,13 +781,17 @@ function clearAll() {
   document.getElementById("article-title").value = "";
   document.getElementById("authors").value = "";
   document.getElementById("keywords").value = "";
+  // Remove custom sections
+  SECTIONS = SECTIONS.filter(s => !s.isCustom);
   SECTIONS.forEach(s => {
-    state.sections[s.id] = "";
+    state.sections[s.id] = { prose: "", tables: [] };
     const el = document.getElementById(`content-${s.id}`);
     if (el) el.value = "";
-    updateWordCount(s.id);
     closeAiBox(s.id);
   });
+  state.library = [];
+  renderLibrary();
+  renderSections();
   updateTotalWordCount();
   updatePreview();
   localStorage.removeItem("mm-article");
@@ -690,23 +875,38 @@ function togglePubmedSelect(i) {
 }
 
 function getSelectedPubmedContext() {
-  if (!selectedPubmed.size) return "";
-  return [...selectedPubmed].map(i => {
+  const parts = [];
+  // From PubMed search results
+  [...selectedPubmed].forEach(i => {
     const a = pubmedArticles[i];
-    if (!a) return "";
-    return `Title: ${a.title}\nAuthors: ${a.authors}\nJournal: ${a.journal} (${a.year})\nAbstract: ${a.abstract || "N/A"}`;
-  }).filter(Boolean).join("\n\n---\n\n");
+    if (!a) return;
+    parts.push(`Title: ${a.title}\nAuthors: ${a.authors}\nJournal: ${a.journal} (${a.year})\nAbstract: ${a.abstract || "N/A"}`);
+  });
+  // From Reference Library (selected entries)
+  state.library.filter(e => e.selected).forEach(e => {
+    const text = e.fullText || e.abstract || "N/A";
+    parts.push(`Title: ${e.title}\nAuthors: ${e.authors}\nJournal: ${e.journal} (${e.year})\nText: ${text.slice(0, 3000)}`);
+  });
+  return parts.join("\n\n---\n\n");
 }
 
 function insertReference(i) {
   const a = pubmedArticles[i];
   if (!a) return;
+  // Add to library if not already there
+  if (!state.library.find(e => e.pmid === a.pmid)) {
+    state.library.push({ ...a, refNumber: state.library.length + 1, selected: true });
+    renderLibrary();
+    scheduleAutoSave();
+  }
+  // Also append to references section text
+  if (!state.sections["references"]) state.sections["references"] = { prose: "", tables: [] };
   const ref = `${a.authors}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}.`;
-  const current = state.sections["references"] || "";
+  const current = state.sections["references"].prose || "";
   const lines = current.trim().split("\n").filter(l => l.trim());
   const num = lines.length + 1;
   const newContent = current.trim() ? `${current.trim()}\n${num}. ${ref}` : `1. ${ref}`;
-  state.sections["references"] = newContent;
+  state.sections["references"].prose = newContent;
   const el = document.getElementById("content-references");
   if (el) el.value = newContent;
   updateWordCount("references");
@@ -722,6 +922,305 @@ function showToast(msg, type = "") {
   t.textContent = msg;
   t.className = `toast show ${type}`;
   setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ── Reference Library ──
+function toggleRefLib() {
+  const body = document.getElementById("reflib-body");
+  const chevron = document.getElementById("reflib-chevron");
+  const open = body.style.display === "none";
+  body.style.display = open ? "block" : "none";
+  chevron.style.transform = open ? "rotate(90deg)" : "";
+}
+
+async function fetchPmids() {
+  const raw = document.getElementById("pmid-input").value;
+  const pmids = raw.split(/[\s,]+/).map(s => s.trim()).filter(s => /^\d+$/.test(s));
+  if (!pmids.length) { showToast("No valid PMIDs found.", "error"); return; }
+  const btn = document.getElementById("fetch-pmids-btn");
+  btn.disabled = true; btn.textContent = "Fetching...";
+  try {
+    const resp = await fetch("/api/fetch-pmids", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pmids }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const data = await resp.json();
+    let added = 0;
+    for (const a of data.found || []) {
+      if (!state.library.find(e => e.pmid === a.pmid)) {
+        state.library.push({ ...a, refNumber: state.library.length + 1, selected: true });
+        added++;
+      }
+    }
+    // renumber
+    state.library.forEach((e, i) => e.refNumber = i + 1);
+    renderLibrary();
+    scheduleAutoSave();
+    const notFound = data.notFound || [];
+    showToast(`Added ${added} reference(s).${notFound.length ? ` Not found: ${notFound.join(", ")}` : ""}`, added ? "success" : "");
+    document.getElementById("pmid-input").value = "";
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Fetch References";
+  }
+}
+
+function renderLibrary() {
+  const list = document.getElementById("reflib-list");
+  const count = document.getElementById("reflib-count");
+  if (!list) return;
+  count.textContent = `${state.library.length} reference${state.library.length !== 1 ? "s" : ""}`;
+  if (!state.library.length) {
+    list.innerHTML = `<div class="reflib-empty">No references yet. Paste PMIDs above or add from PubMed search results.</div>`;
+    return;
+  }
+  list.innerHTML = state.library.map(e => `
+    <div class="reflib-item">
+      <span class="reflib-num">[${e.refNumber}]</span>
+      <div style="flex:1;min-width:0">
+        <div class="reflib-title">${htmlEsc(e.title || "")} ${e.isOA ? '<span class="reflib-oa">OA</span>' : ""}</div>
+        <div class="reflib-meta">${htmlEsc(e.authors || "")} &bull; ${htmlEsc(e.journal || "")} ${htmlEsc(e.year || "")} &bull; PMID: ${htmlEsc(e.pmid || "")}</div>
+        <div class="reflib-actions">
+          <button class="btn btn-outline btn-sm" onclick="toggleLibrarySelect('${e.pmid}')" id="libsel-${e.pmid}" style="${e.selected ? 'background:var(--ai);color:#fff;border-color:var(--ai)' : ''}">
+            ${e.selected ? "✓ In AI" : "Use in AI"}
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="removeFromLibrary('${e.pmid}')">✕</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function removeFromLibrary(pmid) {
+  state.library = state.library.filter(e => e.pmid !== pmid);
+  state.library.forEach((e, i) => e.refNumber = i + 1);
+  renderLibrary();
+  updatePreview();
+  scheduleAutoSave();
+}
+
+function toggleLibrarySelect(pmid) {
+  const entry = state.library.find(e => e.pmid === pmid);
+  if (entry) { entry.selected = !entry.selected; renderLibrary(); }
+}
+
+function selectAllLibrary(val) {
+  state.library.forEach(e => e.selected = val);
+  renderLibrary();
+}
+
+function syncReferencesSection() {
+  if (!state.library.length) { showToast("No references in library.", "error"); return; }
+  const text = state.library.map(e =>
+    `${e.refNumber}. ${e.authors}. ${e.title}. ${e.journal}. ${e.year}. PMID: ${e.pmid}.`
+  ).join("\n");
+  if (!state.sections["references"]) state.sections["references"] = { prose: "", tables: [] };
+  state.sections["references"].prose = text;
+  const el = document.getElementById("content-references");
+  if (el) el.value = text;
+  updateWordCount("references");
+  updateTotalWordCount();
+  updatePreview();
+  scheduleAutoSave();
+  showToast("References section updated.", "success");
+}
+
+// ── Custom Sections ──
+function openAddSectionModal() {
+  const sel = document.getElementById("new-section-position");
+  sel.innerHTML = SECTIONS
+    .filter(s => s.id !== "references")
+    .map(s => `<option value="${s.id}">${s.title}</option>`).join("") +
+    `<option value="__end__">At end (before References)</option>`;
+  sel.value = "__end__";
+  document.getElementById("new-section-title").value = "";
+  document.getElementById("add-section-modal").classList.add("open");
+  setTimeout(() => document.getElementById("new-section-title").focus(), 50);
+}
+
+function closeAddSectionModal() {
+  document.getElementById("add-section-modal").classList.remove("open");
+}
+
+function confirmAddSection() {
+  const title = document.getElementById("new-section-title").value.trim();
+  if (!title) { showToast("Enter a section title.", "error"); return; }
+  const afterId = document.getElementById("new-section-position").value;
+  addCustomSection(title, afterId);
+  closeAddSectionModal();
+}
+
+function addCustomSection(title, afterId) {
+  const id = "custom_" + Date.now();
+  const newSection = { id, num: "", title, placeholder: `Write about ${title}...`, isCustom: true };
+  state.sections[id] = { prose: "", tables: [] };
+  const refIdx = SECTIONS.findIndex(s => s.id === "references");
+  let insertIdx = afterId === "__end__"
+    ? refIdx
+    : SECTIONS.findIndex(s => s.id === afterId) + 1;
+  if (insertIdx <= 0 || insertIdx > refIdx) insertIdx = refIdx;
+  SECTIONS.splice(insertIdx, 0, newSection);
+  renderSections();
+  document.getElementById(`section-${id}`)?.classList.add("open");
+  scheduleAutoSave();
+  showToast(`Section "${title}" added.`, "success");
+}
+
+function deleteSection(id) {
+  const s = SECTIONS.find(s => s.id === id);
+  if (!confirm(`Delete section "${s?.title}"? Content will be lost.`)) return;
+  SECTIONS.splice(SECTIONS.findIndex(s => s.id === id), 1);
+  delete state.sections[id];
+  renderSections();
+  updatePreview();
+  scheduleAutoSave();
+}
+
+function renameSection(id) {
+  const s = SECTIONS.find(s => s.id === id);
+  const newTitle = prompt("Rename section:", s?.title || "");
+  if (!newTitle?.trim() || newTitle.trim() === s?.title) return;
+  s.title = newTitle.trim();
+  renderSections();
+  scheduleAutoSave();
+}
+
+// ── Table Generation ──
+function openTablePrompt(sectionId, sectionTitle) {
+  tableModalSectionId = sectionId;
+  document.getElementById("table-modal-section-name").textContent = sectionTitle;
+  document.getElementById("table-description").value = "";
+  document.getElementById("table-gen-status").style.display = "none";
+  document.getElementById("table-gen-btn").disabled = false;
+  document.getElementById("table-modal").classList.add("open");
+  setTimeout(() => document.getElementById("table-description").focus(), 50);
+}
+
+function closeTableModal() {
+  document.getElementById("table-modal").classList.remove("open");
+  tableModalSectionId = null;
+}
+
+async function generateTable() {
+  const desc = document.getElementById("table-description").value.trim();
+  if (!desc) { showToast("Describe the table first.", "error"); return; }
+  if (!tableModalSectionId) return;
+  const sectionTitle = document.getElementById("table-modal-section-name").textContent;
+  const btn = document.getElementById("table-gen-btn");
+  const status = document.getElementById("table-gen-status");
+  btn.disabled = true;
+  status.style.display = "block";
+  try {
+    const resp = await fetch("/api/generate-table", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: getTopic(), sectionTitle,
+        tableDescription: desc,
+        pubmedContext: getSelectedPubmedContext(),
+      }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let html = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+    }
+    const captionMatch = html.match(/<caption[^>]*>([\s\S]*?)<\/caption>/i);
+    const caption = captionMatch ? captionMatch[1].replace(/<[^>]+>/g, "").trim() : desc;
+    const tableEntry = { id: "tbl_" + Date.now(), caption, html };
+    if (!state.sections[tableModalSectionId]) state.sections[tableModalSectionId] = { prose: "", tables: [] };
+    if (!state.sections[tableModalSectionId].tables) state.sections[tableModalSectionId].tables = [];
+    state.sections[tableModalSectionId].tables.push(tableEntry);
+    renderSectionTables(tableModalSectionId);
+    updatePreview();
+    scheduleAutoSave();
+    showToast("Table added!", "success");
+    closeTableModal();
+  } catch (err) {
+    showToast("Table failed: " + err.message, "error");
+  } finally {
+    btn.disabled = false;
+    status.style.display = "none";
+  }
+}
+
+function renderSectionTables(sectionId) {
+  const container = document.getElementById(`tables-${sectionId}`);
+  if (!container) return;
+  const tables = state.sections[sectionId]?.tables || [];
+  if (!tables.length) { container.innerHTML = ""; return; }
+  container.innerHTML = tables.map(t => `
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-caption">${htmlEsc(t.caption || "Table")}</span>
+        <button class="btn btn-secondary btn-sm" onclick="deleteTable('${sectionId}','${t.id}')">✕ Remove</button>
+      </div>
+      <div class="table-html-preview">${t.html || ""}</div>
+    </div>
+  `).join("");
+}
+
+function deleteTable(sectionId, tableId) {
+  if (!state.sections[sectionId]) return;
+  state.sections[sectionId].tables = (state.sections[sectionId].tables || []).filter(t => t.id !== tableId);
+  renderSectionTables(sectionId);
+  updatePreview();
+  scheduleAutoSave();
+}
+
+// ── Section Refinement ──
+function refineSection(id, title) {
+  const instruction = document.getElementById(`refine-input-${id}`)?.value.trim();
+  if (!instruction) { showToast("Enter a refinement instruction.", "error"); return; }
+  const contentEl = document.getElementById(`ai-content-${id}`);
+  const currentDraft = (contentEl?.innerText || contentEl?.textContent || "").trim();
+  if (!currentDraft) { showToast("Generate a draft first.", "error"); return; }
+  if (!refinementHistory[id]) refinementHistory[id] = [];
+  refinementHistory[id].push(currentDraft);
+  if (refinementHistory[id].length > 5) refinementHistory[id].shift();
+  const undoBtn = document.getElementById(`ai-undo-${id}`);
+  if (undoBtn) undoBtn.style.display = "";
+  document.getElementById(`refine-input-${id}`).value = "";
+  streamToAiBox("/api/refine", {
+    topic: getTopic(), sectionTitle: title,
+    currentDraft, instruction,
+    pubmedContext: getSelectedPubmedContext(),
+  }, id, "↺ Refined Draft", true);
+}
+
+function undoRefinement(id) {
+  if (!refinementHistory[id]?.length) return;
+  const prev = refinementHistory[id].pop();
+  const contentEl = document.getElementById(`ai-content-${id}`);
+  if (contentEl) contentEl.innerText = prev;
+  if (!refinementHistory[id].length) {
+    const undoBtn = document.getElementById(`ai-undo-${id}`);
+    if (undoBtn) undoBtn.style.display = "none";
+  }
+}
+
+// ── Citation Enhancement ──
+function enhanceCitations(text, library) {
+  // Escape HTML
+  let html = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if (!library?.length) return html;
+  // Replace [Author et al., YYYY] or [Author, YYYY]
+  return html.replace(/\[([A-Z][a-zA-Z\-]+(?:\s+et\s+al\.)?),?\s*(\d{4})\]/g, (match, author, year) => {
+    const surname = author.replace(/\s+et\s+al\.?/i, "").trim().toLowerCase();
+    const entry = library.find(r =>
+      r.authors && r.authors.toLowerCase().includes(surname) && r.year === year
+    );
+    if (entry) {
+      const refText = `${entry.authors}. ${entry.title}. ${entry.journal}. ${entry.year}. PMID: ${entry.pmid}`.replace(/"/g, "&quot;");
+      return `<sup class="cite-link" title="${refText}">[${entry.refNumber}]</sup>`;
+    }
+    return `<span class="cite-unmatched" title="Not found in Reference Library">${match}</span>`;
+  });
 }
 </script>
 </body>
