@@ -286,10 +286,6 @@
       <a class="btn-dashboard" href="/dashboard">Dashboard</a>
       <button class="btn btn-secondary btn-sm" onclick="signOut()">Sign out</button>
     </div>
-    <span class="total-wc" id="total-wc">0 words</span>
-    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
-    <button class="btn btn-secondary" onclick="downloadDOCX()">⬇ DOCX</button>
-    <button class="btn btn-primary" onclick="downloadPDF()">⬇ PDF</button>
   </div>
 </header>
 
@@ -386,9 +382,14 @@
 
   <!-- RIGHT: Preview -->
   <div class="panel right-col">
-    <div class="panel-header">
+    <div class="panel-header" style="flex-wrap:wrap;gap:8px">
       <span class="panel-title">Article Preview</span>
-      <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ PDF</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="total-wc" id="total-wc">0 words</span>
+        <button class="btn btn-secondary btn-sm" onclick="clearAll()">Clear All</button>
+        <button class="btn btn-secondary btn-sm" onclick="downloadDOCX()">⬇ DOCX</button>
+        <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ PDF</button>
+      </div>
     </div>
     <div class="preview-wrapper">
       <div id="article-preview">
