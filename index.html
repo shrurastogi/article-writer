@@ -45,6 +45,12 @@
     .logo-divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
     .header-right { display: flex; align-items: center; gap: 10px; }
     .total-wc { font-size: 0.8rem; color: var(--muted); background: var(--bg); padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+    .user-widget { display: none; align-items: center; gap: 8px; }
+    .user-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+    .user-avatar-placeholder { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .user-name { font-size: 0.82rem; color: var(--secondary); }
+    .btn-dashboard { font-size: 0.82rem; color: var(--ai); text-decoration: none; padding: 4px 8px; border-radius: 5px; border: 1px solid var(--ai-border); }
+    .btn-dashboard:hover { background: var(--ai-light); }
 
     /* ── Buttons ── */
     .btn {
@@ -274,6 +280,12 @@
     <div class="logo-text">Medical <span>Article Writer</span></div>
   </div>
   <div class="header-right">
+    <div class="user-widget" id="user-widget">
+      <span id="user-avatar-wrap"></span>
+      <span class="user-name" id="user-name-display"></span>
+      <a class="btn-dashboard" href="/dashboard">Dashboard</a>
+      <button class="btn btn-secondary btn-sm" onclick="signOut()">Sign out</button>
+    </div>
     <span class="total-wc" id="total-wc">0 words</span>
     <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
     <button class="btn btn-secondary" onclick="downloadDOCX()">⬇ DOCX</button>
@@ -451,11 +463,15 @@ const state = {
 const refinementHistory = {};  // { [sectionId]: string[] }
 let tableModalSectionId = null;
 let autoSaveTimer = null;
+const articleId = new URLSearchParams(window.location.search).get("id");
 
 // ── Init ──
-loadFromStorage();
-renderSections();
-updatePreview();
+(async () => {
+  await checkAuth();
+  await loadArticle();
+  renderSections();
+  updatePreview();
+})();
 
 // ── Render accordion sections ──
 function renderSections() {
@@ -840,11 +856,51 @@ async function downloadDOCX() {
   }
 }
 
-// ── Auto-save ──
+// ── Auth ──
+async function checkAuth() {
+  try {
+    const res = await fetch("/auth/me");
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return null;
+    }
+    const user = await res.json();
+    hydrateUserWidget(user);
+    return user;
+  } catch {
+    window.location.href = "/login";
+    return null;
+  }
+}
+
+function hydrateUserWidget(user) {
+  const wrap = document.getElementById("user-avatar-wrap");
+  if (user.avatarUrl) {
+    const img = document.createElement("img");
+    img.src = user.avatarUrl;
+    img.alt = user.name;
+    img.className = "user-avatar";
+    wrap.appendChild(img);
+  } else {
+    const div = document.createElement("div");
+    div.className = "user-avatar-placeholder";
+    div.textContent = (user.name || "U")[0].toUpperCase();
+    wrap.appendChild(div);
+  }
+  document.getElementById("user-name-display").textContent = user.name;
+  document.getElementById("user-widget").style.display = "flex";
+}
+
+async function signOut() {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
+
+// ── Auto-save (localStorage write-behind + server primary) ──
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => {
-    localStorage.setItem("mm-article", JSON.stringify({
+  autoSaveTimer = setTimeout(async () => {
+    const payload = {
       topic: document.getElementById("medical-topic").value,
       title: document.getElementById("article-title").value,
       authors: document.getElementById("authors").value,
@@ -852,41 +908,77 @@ function scheduleAutoSave() {
       sections: state.sections,
       library: state.library,
       customSections: SECTIONS.filter(s => s.isCustom),
-    }));
+    };
+
+    // localStorage write-behind (sync, always)
+    localStorage.setItem("mm-article", JSON.stringify(payload));
+
+    // Server save (async, only if we have an articleId)
+    if (articleId) {
+      try {
+        const res = await fetch(`/api/articles/${articleId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch {
+        showToast("Auto-save to server failed — changes saved locally.", "error");
+      }
+    }
   }, 1500);
+}
+
+// ── Load article (server-primary, localStorage fallback) ──
+async function loadArticle() {
+  if (articleId) {
+    try {
+      const res = await fetch(`/api/articles/${articleId}`);
+      if (res.ok) {
+        const { article } = await res.json();
+        applyArticleData(article);
+        return;
+      }
+    } catch { /* fall through to localStorage */ }
+  }
+  loadFromStorage();
 }
 
 function loadFromStorage() {
   try {
     const saved = localStorage.getItem("mm-article");
     if (!saved) return;
-    const data = JSON.parse(saved);
-    if (data.topic) document.getElementById("medical-topic").value = data.topic;
-    if (data.title) document.getElementById("article-title").value = data.title;
-    if (data.authors) document.getElementById("authors").value = data.authors;
-    if (data.keywords) document.getElementById("keywords").value = data.keywords;
-    if (data.customSections?.length) {
-      const refIdx = SECTIONS.findIndex(s => s.id === "references");
-      for (const cs of data.customSections) {
-        if (!SECTIONS.find(s => s.id === cs.id)) {
-          SECTIONS.splice(refIdx, 0, cs);
-        }
-      }
-    }
-    if (data.sections) {
-      for (const [id, val] of Object.entries(data.sections)) {
-        state.sections[id] = typeof val === "string" ? { prose: val, tables: [] } : (val || { prose: "", tables: [] });
-        const el = document.getElementById(`content-${id}`);
-        if (el) el.value = state.sections[id].prose || "";
-      }
-    }
-    if (data.library?.length) {
-      state.library = data.library;
-      renderLibrary();
-    }
-    SECTIONS.forEach(s => updateWordCount(s.id));
-    updateTotalWordCount();
+    applyArticleData(JSON.parse(saved));
   } catch (e) { /* ignore */ }
+}
+
+function applyArticleData(data) {
+  if (!data) return;
+  if (data.topic) document.getElementById("medical-topic").value = data.topic;
+  if (data.title) document.getElementById("article-title").value = data.title;
+  if (data.authors) document.getElementById("authors").value = data.authors;
+  if (data.keywords) document.getElementById("keywords").value = data.keywords;
+  if (data.customSections?.length) {
+    const refIdx = SECTIONS.findIndex(s => s.id === "references");
+    for (const cs of data.customSections) {
+      if (!SECTIONS.find(s => s.id === cs.id)) {
+        SECTIONS.splice(refIdx, 0, cs);
+      }
+    }
+  }
+  if (data.sections) {
+    for (const [id, val] of Object.entries(data.sections)) {
+      state.sections[id] = typeof val === "string" ? { prose: val, tables: [] } : (val || { prose: "", tables: [] });
+      const el = document.getElementById(`content-${id}`);
+      if (el) el.value = state.sections[id].prose || "";
+    }
+  }
+  if (data.library?.length) {
+    state.library = data.library;
+    renderLibrary();
+  }
+  SECTIONS.forEach(s => updateWordCount(s.id));
+  updateTotalWordCount();
 }
 
 // ── Clear all ──
