@@ -1,0 +1,26 @@
+{
+  "env": {
+    "node": true,
+    "browser": true,
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022
+  },
+  "rules": {
+    "no-var": "error",
+    "prefer-const": "warn",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": ["warn", { "allow": ["error", "warn"] }],
+    "eqeqeq": ["error", "always"],
+    "no-implicit-globals": "error",
+    "no-undef": "warn",
+    "no-unreachable": "error",
+    "no-constant-condition": "error",
+    "handle-callback-err": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "*.min.js"
+  ]
+}

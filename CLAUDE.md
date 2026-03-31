@@ -2,6 +2,37 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules & Standards
+
+**Read `docs/RULES.md` before making any changes.** It defines:
+- Git branching and PR rules (never commit to `main` directly)
+- Sprint planning requirements (feature must be in an active sprint before coding starts)
+- Coding standards: naming conventions, error handling, logging, security
+- Testing requirements and CI gates
+- Brand guidelines (GSK colors)
+
+## Specialist Commands
+
+Use these slash commands when working on specific areas:
+
+| Command | When to use |
+|---|---|
+| `/frontend` | Building or modifying UI in `index.html` |
+| `/backend` | Adding or modifying endpoints in `server.js` |
+| `/test` | Writing unit, integration, or E2E tests |
+| `/review` | Reviewing staged changes or a PR before merge |
+| `/sprint` | Planning a new sprint from PRD backlog items |
+
+## Documentation Map
+
+| Document | Purpose |
+|---|---|
+| `docs/PRD.md` | What is being built and why — source of truth for features |
+| `docs/ARCHITECTURE.md` | How the system works — update when structure changes |
+| `docs/RULES.md` | Development standards — must be followed in every session |
+| `docs/API.md` | API contract — update when endpoints change |
+| `docs/sprints/` | Sprint plans — every feature must be in a sprint before coding |
+
 ## Commands
 
 ```bash

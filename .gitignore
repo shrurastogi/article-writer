@@ -3,4 +3,6 @@ node_modules/
 *.log
 uploads/
 tmp/
-.claude/
+.claude/*
+!.claude/commands/
+!.claude/commands/**

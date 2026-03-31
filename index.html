@@ -9,21 +9,24 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
+      /* GSK Brand Colors */
+      --primary: #F36633;
+      --primary-dark: #D4551A;
       --secondary: #64748b;
-      --bg: #f1f5f9;
+      --bg: #f8f4f1;
       --card: #ffffff;
-      --border: #e2e8f0;
+      --border: #e8e0d8;
       --text: #1e293b;
       --muted: #94a3b8;
       --success: #22c55e;
-      --ai: #7c3aed;
-      --ai-light: #f5f3ff;
-      --ai-border: #ddd6fe;
+      --ai: #1A1F71;
+      --ai-light: #f0f0f8;
+      --ai-border: #c8c8e8;
       --pubmed: #0369a1;
       --pubmed-light: #f0f9ff;
       --pubmed-border: #bae6fd;
+      --gsk-orange: #F36633;
+      --gsk-navy: #1A1F71;
     }
 
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -35,8 +38,11 @@
       display: flex; align-items: center; justify-content: space-between;
       position: sticky; top: 0; z-index: 100;
     }
-    .logo { font-weight: 700; font-size: 1.05rem; color: var(--ai); }
-    .logo span { color: var(--text); font-weight: 400; }
+    .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .logo-gsk { display: flex; align-items: center; }
+    .logo-text { font-weight: 700; font-size: 1.05rem; color: var(--gsk-navy); }
+    .logo-text span { color: var(--secondary); font-weight: 400; }
+    .logo-divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
     .header-right { display: flex; align-items: center; gap: 10px; }
     .total-wc { font-size: 0.8rem; color: var(--muted); background: var(--bg); padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
 
@@ -257,7 +263,16 @@
 <body>
 
 <header>
-  <div class="logo">Medical <span>Article Writer</span></div>
+  <div class="logo">
+    <!-- GSK Logo — replace src with official asset when available -->
+    <div class="logo-gsk">
+      <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="GSK">
+        <text x="0" y="19" font-family="Arial, sans-serif" font-size="20" font-weight="800" fill="#F36633" letter-spacing="-0.5">GSK</text>
+      </svg>
+    </div>
+    <div class="logo-divider"></div>
+    <div class="logo-text">Medical <span>Article Writer</span></div>
+  </div>
   <div class="header-right">
     <span class="total-wc" id="total-wc">0 words</span>
     <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
