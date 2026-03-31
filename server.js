@@ -3,12 +3,55 @@ const express = require("express");
 const path = require("path");
 const OpenAI = require("openai");
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType } = require("docx");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
+const passport = require("passport");
+const mongoose = require("mongoose");
+const logger = require("./lib/logger");
+const { requireAuth } = require("./middleware/auth");
+require("./lib/passport-config");
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
-app.use(express.static(path.join(__dirname)));
+
+// ── Database ──────────────────────────────────────────────────────────────────
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => logger.info("MongoDB connected"))
+    .catch((err) => logger.error({ msg: "MongoDB connection error", error: err.message }));
+}
+
+// ── Session & Passport ────────────────────────────────────────────────────────
+app.use(session({
+  secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
+  resave: false,
+  saveUninitialized: false,
+  store: process.env.MONGODB_URI
+    ? MongoStore.create({ mongoUrl: process.env.MONGODB_URI })
+    : undefined,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ── Page routes (auth-guarded) ────────────────────────────────────────────────
+app.get("/", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+app.get("/dashboard", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "dashboard.html"));
+});
+app.get("/login", (req, res) => {
+  if (req.isAuthenticated()) return res.redirect("/dashboard");
+  res.sendFile(path.join(__dirname, "login.html"));
+});
+
+app.use(express.static(path.join(__dirname), { index: false }));
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
@@ -81,7 +124,7 @@ Requirements:
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
@@ -133,7 +176,7 @@ ${content}`;
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
@@ -181,7 +224,7 @@ Format as a clear bulleted list. Each point must be specific and actionable, not
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
@@ -225,7 +268,7 @@ app.post("/api/pubmed-search", async (req, res) => {
     const total = parseInt(searchData.esearchresult?.count || "0", 10);
     res.json({ articles, total });
   } catch (err) {
-    console.error("PubMed error:", err.message);
+    logger.error({ msg: "PubMed search error", error: err.message });
     res.status(500).json({ error: "PubMed search failed: " + err.message });
   }
 });
@@ -421,7 +464,7 @@ app.post("/api/export-docx", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (err) {
-    console.error("DOCX export error:", err.message);
+    logger.error({ msg: "DOCX export error", error: err.message });
     res.status(500).json({ error: "Failed to generate DOCX: " + err.message });
   }
 });
@@ -489,7 +532,7 @@ app.post("/api/fetch-pmids", async (req, res) => {
           if (links.length > 0) pmcid = String(links[0]);
         }
       } catch (err) {
-        console.error(`elink error for PMID ${article.pmid}:`, err.message);
+        logger.error({ msg: "elink error", pmid: article.pmid, error: err.message });
       }
 
       if (pmcid) {
@@ -504,7 +547,7 @@ app.post("/api/fetch-pmids", async (req, res) => {
             }
           }
         } catch (err) {
-          console.error(`OA check error for PMC${pmcid}:`, err.message);
+          logger.error({ msg: "OA check error", pmcid: `PMC${pmcid}`, error: err.message });
         }
 
         if (isOA) {
@@ -524,7 +567,7 @@ app.post("/api/fetch-pmids", async (req, res) => {
               fullText = passages.join(" ").trim().slice(0, 6000) || null;
             }
           } catch (err) {
-            console.error(`BioC fetch error for PMC${pmcid}:`, err.message);
+            logger.error({ msg: "BioC fetch error", pmcid: `PMC${pmcid}`, error: err.message });
           }
         }
       }
@@ -552,7 +595,7 @@ app.post("/api/fetch-pmids", async (req, res) => {
 
     res.json({ found: articles, notFound });
   } catch (err) {
-    console.error("fetch-pmids error:", err.message);
+    logger.error({ msg: "fetch-pmids error", error: err.message });
     res.status(500).json({ error: "Failed to fetch PMIDs: " + err.message });
   }
 });
@@ -609,7 +652,7 @@ Example structure:
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
@@ -660,7 +703,7 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
@@ -719,13 +762,13 @@ Be direct and specific. Do not pad with generic praise.`;
     }
     res.end();
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    logger.error({ msg: "Groq API error", error: err.message });
     res.status(500).json({ error: "Failed to call Groq API: " + err.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Medical Article Writer running at http://localhost:${PORT}`);
-  console.log(`Groq API key:  ${process.env.GROQ_API_KEY ? "✓ Loaded" : "✗ MISSING — add GROQ_API_KEY to .env"}`);
-  console.log(`NCBI API key:  ${NCBI_API_KEY ? "✓ Loaded (10 req/s)" : "not set — anonymous rate limit (3 req/s)"}`);
+  logger.info(`Medical Article Writer running at http://localhost:${PORT}`);
+  logger.info(`Groq API key:  ${process.env.GROQ_API_KEY ? "✓ Loaded" : "✗ MISSING — add GROQ_API_KEY to .env"}`);
+  logger.info(`NCBI API key:  ${NCBI_API_KEY ? "✓ Loaded (10 req/s)" : "not set — anonymous rate limit (3 req/s)"}`);
 });
