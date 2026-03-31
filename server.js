@@ -25,6 +25,9 @@ if (process.env.MONGODB_URI) {
     .catch((err) => logger.error({ msg: "MongoDB connection error", error: err.message }));
 }
 
+// Trust Railway/Heroku/etc. reverse proxy so secure cookies work over HTTPS
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+
 // ── Session & Passport ────────────────────────────────────────────────────────
 app.use(session({
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
@@ -35,6 +38,7 @@ app.use(session({
     : undefined,
   cookie: {
     secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "lax" : false,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
 }));
