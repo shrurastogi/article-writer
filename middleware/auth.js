@@ -1,7 +1,8 @@
 /**
  * Auth middleware.
- * requireAuth  — blocks unauthenticated requests.
- * optionalAuth — always passes; use where auth is helpful but not required.
+ * requireAuth    — for page routes: redirects browsers to /login, returns JSON 401 for API clients.
+ * requireApiAuth — for API routes: always returns JSON 401 (never redirects).
+ * optionalAuth   — always passes; use where auth is helpful but not required.
  */
 
 function requireAuth(req, res, next) {
@@ -15,8 +16,13 @@ function requireAuth(req, res, next) {
   res.redirect("/login");
 }
 
+function requireApiAuth(req, res, next) {
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ error: "Authentication required.", code: "UNAUTHENTICATED" });
+}
+
 function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, optionalAuth };
+module.exports = { requireAuth, requireApiAuth, optionalAuth };

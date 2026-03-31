@@ -1,12 +1,12 @@
 const express = require("express");
 const Article = require("../models/article");
 const logger = require("../lib/logger");
-const { requireAuth } = require("../middleware/auth");
+const { requireApiAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-// All article routes require authentication
-router.use(requireAuth);
+// All article routes require authentication — always return JSON 401, never redirect
+router.use(requireApiAuth);
 
 // ── GET /api/articles — list user's articles ──────────────────────────────────
 
