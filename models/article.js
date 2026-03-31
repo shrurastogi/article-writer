@@ -17,6 +17,14 @@ const articleSchema = new mongoose.Schema({
 // Compound index for efficient sorted dashboard queries
 articleSchema.index({ _userId: 1, updatedAt: -1 });
 
+// Mongoose drops empty Mixed fields ({}) during JSON serialization — ensure sections always present
+articleSchema.set("toJSON", {
+  transform: (doc, ret) => {
+    if (ret.sections === undefined || ret.sections === null) ret.sections = {};
+    return ret;
+  },
+});
+
 // Compute word count from all section prose values
 articleSchema.methods.computeWordCount = function () {
   const sections = this.sections || {};
