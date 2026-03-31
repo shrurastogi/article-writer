@@ -414,6 +414,7 @@ app.post("/api/export-docx", async (req, res) => {
           children.push(
             new Paragraph({
               text: line.trim(),
+              alignment: AlignmentType.JUSTIFIED,
               spacing: { after: 120 },
             })
           );
