@@ -9,6 +9,7 @@ const passport = require("passport");
 const mongoose = require("mongoose");
 const logger = require("./lib/logger");
 const { requireAuth } = require("./middleware/auth");
+const articlesRouter = require("./routes/articles-router");
 require("./lib/passport-config");
 
 const app = express();
@@ -52,6 +53,9 @@ app.get("/login", (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname), { index: false }));
+
+// ── API routers ───────────────────────────────────────────────────────────────
+app.use("/api/articles", articlesRouter);
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
