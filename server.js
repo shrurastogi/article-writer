@@ -140,7 +140,7 @@ ${content}`;
 
 // Suggest key points to cover in a section
 app.post("/api/keypoints", async (req, res) => {
-  const { topic, sectionId, sectionTitle } = req.body;
+  const { topic, sectionId, sectionTitle, pubmedContext } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -148,6 +148,9 @@ app.post("/api/keypoints", async (req, res) => {
 
   const subject = topic.trim();
   const context = getSectionContext(subject, sectionId, sectionTitle);
+  const litText = pubmedContext?.trim()
+    ? `\n\nSelected references from the user's library (abstracts and available full-text). Extract specific key points, trial names, statistics, and findings directly from these papers:\n${pubmedContext}`
+    : "";
 
   const prompt = `You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.
 
@@ -157,8 +160,9 @@ Include:
 - Current guidelines and consensus recommendations
 - Important recent developments (last 3–5 years)
 - Specific drug names, biomarkers, or criteria where relevant
+${pubmedContext?.trim() ? "- Cite specific findings from the provided references where applicable (Author et al., Year)" : ""}
 
-Format as a clear bulleted list. Each point must be specific and actionable, not generic.`;
+Format as a clear bulleted list. Each point must be specific and actionable, not generic.${litText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -646,6 +650,65 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
     const stream = await client.chat.completions.create({
       model: MODEL,
       max_tokens: 1800,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    console.error("Groq API error:", err.message);
+    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+  }
+});
+
+// Check full-paper coherence and flow
+app.post("/api/coherence-check", async (req, res) => {
+  const { topic, sections } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return res.status(400).json({ error: "No sections provided." });
+  }
+
+  const sectionBlock = sections
+    .map(s => `### ${s.title}\n${(s.prose || "").slice(0, 2000)}${s.prose?.length > 2000 ? "\n[...truncated]" : ""}`)
+    .join("\n\n");
+
+  const prompt = `You are a senior scientific editor reviewing a full draft review article on "${topic.trim()}" for coherence, logical flow, and narrative consistency.
+
+Here is the full article draft:
+
+${sectionBlock}
+
+Evaluate the article and return your analysis in exactly this structure:
+
+## Overall Assessment
+One sentence verdict: does the paper flow as a coherent whole? (e.g. "Strong overall flow with minor disconnect in sections 3–4.")
+
+## Section-by-Section Flow
+For each adjacent section pair, one line: ✅ if the transition is smooth, ⚠️ if there is a minor issue, ❌ if there is a clear disconnect. Include a brief reason for ⚠️ and ❌.
+
+## Key Issues Found
+Numbered list of specific problems: terminology inconsistencies, repeated content, missing links between sections, claims in one section contradicted elsewhere, or conclusions not supported by the body. Be specific (name the sections).
+
+## Recommendations
+Numbered list of concrete, actionable edits to fix the issues above. Each recommendation must name the target section(s).
+
+Be direct and specific. Do not pad with generic praise.`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await client.chat.completions.create({
+      model: MODEL,
+      max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
       stream: true,
     });

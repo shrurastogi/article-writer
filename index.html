@@ -189,6 +189,12 @@
     .reflib-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
     .reflib-empty { color: var(--muted); font-size: 0.82rem; text-align: center; padding: 12px 0; }
 
+    /* ── Reference Library tabs ── */
+    .reflib-tabs { display: flex; border-bottom: 1px solid #86efac; background: #f0fdf4; }
+    .reflib-tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 9px 18px; font-size: 0.85rem; font-weight: 500; cursor: pointer; color: var(--muted); margin-bottom: -1px; transition: all 0.15s; font-family: inherit; }
+    .reflib-tab:hover { color: #15803d; }
+    .reflib-tab.active { color: #15803d; border-bottom-color: #16a34a; }
+
     /* ── Section header icon buttons ── */
     .btn-icon { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.82rem; padding: 2px 5px; border-radius: 4px; line-height: 1; }
     .btn-icon:hover { background: var(--bg); color: var(--text); }
@@ -221,6 +227,24 @@
     .p-table-wrap th { background: #f1f5f9; font-weight: 700; padding: 6px 10px; border: 1px solid #ccc; text-align: left; }
     .p-table-wrap td { padding: 5px 10px; border: 1px solid #ccc; vertical-align: top; }
     .p-table-wrap caption { font-style: italic; font-size: 9pt; margin-bottom: 4px; text-align: left; caption-side: top; }
+
+    /* ── Coherence checker ── */
+    .coherence-panel {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; margin-top: 12px; overflow: hidden;
+    }
+    .coherence-header {
+      padding: 14px 18px; display: flex; align-items: center;
+      justify-content: space-between; background: #fafafa;
+      border-bottom: 1px solid var(--border);
+    }
+    .coherence-body { padding: 16px 18px; display: none; }
+    .coherence-body.visible { display: block; }
+    .coherence-output {
+      white-space: pre-wrap; font-size: 0.85rem; line-height: 1.7;
+      color: var(--text); max-height: 500px; overflow-y: auto;
+    }
+    .coherence-output .co-loading { color: var(--ai); font-style: italic; }
 
     /* ── Modals ── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; }
@@ -270,7 +294,7 @@
       </div>
     </div>
 
-    <!-- Reference Library -->
+    <!-- Reference Library + PubMed Search (tabbed) -->
     <div class="panel" style="margin-bottom:12px;border-color:#86efac">
       <div class="panel-header" style="cursor:pointer;background:#f0fdf4" onclick="toggleRefLib()">
         <span class="panel-title" style="color:#15803d">Reference Library</span>
@@ -279,34 +303,34 @@
           <span id="reflib-chevron" style="font-size:0.65rem;color:var(--muted);transition:transform 0.2s">▶</span>
         </div>
       </div>
-      <div id="reflib-body" style="display:none;padding:14px 18px">
-        <label>Paste PMIDs <span style="font-weight:400;color:var(--muted)">(comma or newline separated)</span></label>
-        <textarea id="pmid-input" rows="3" placeholder="e.g. 36924986, 35551128&#10;37208067" style="margin-bottom:8px"></textarea>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-          <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="fetchPmids()" id="fetch-pmids-btn">Fetch References</button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(true)">Select All</button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(false)">Deselect All</button>
-          <button class="btn btn-secondary btn-sm" onclick="syncReferencesSection()">↺ Sync References</button>
+      <div id="reflib-body" style="display:none">
+        <div class="reflib-tabs">
+          <button class="reflib-tab active" onclick="switchRefTab(event,'references')">References</button>
+          <button class="reflib-tab" onclick="switchRefTab(event,'pubmed')">PubMed Search</button>
         </div>
-        <div id="reflib-list" class="reflib-list">
-          <div class="reflib-empty">No references yet. Paste PMIDs above or add from PubMed search results.</div>
+        <!-- References tab -->
+        <div id="reflib-tab-references" style="padding:14px 18px">
+          <label>Paste PMIDs <span style="font-weight:400;color:var(--muted)">(comma or newline separated)</span></label>
+          <textarea id="pmid-input" rows="3" placeholder="e.g. 36924986, 35551128&#10;37208067" style="margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="fetchPmids()" id="fetch-pmids-btn">Fetch References</button>
+            <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(true)">Select All</button>
+            <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(false)">Deselect All</button>
+            <button class="btn btn-secondary btn-sm" onclick="syncReferencesSection()">↺ Sync References</button>
+          </div>
+          <div id="reflib-list" class="reflib-list">
+            <div class="reflib-empty">No references yet. Paste PMIDs above or add from PubMed search results.</div>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- PubMed search -->
-    <div class="panel" style="margin-bottom:12px">
-      <div class="panel-header">
-        <span class="panel-title">PubMed Search</span>
-        <span style="font-size:0.78rem;color:var(--muted)">Find references to ground AI generation</span>
-      </div>
-      <div class="panel-body" style="padding-bottom:12px">
-        <div class="pubmed-search-row">
-          <input type="text" id="pubmed-query" placeholder="Search PubMed (uses topic if blank)..." onkeydown="if(event.key==='Enter')searchPubMed()" />
-          <button class="btn btn-pubmed btn-sm" onclick="searchPubMed()" id="pubmed-btn">Search</button>
-        </div>
-        <div id="pubmed-results" class="pubmed-results">
-          <div class="pubmed-empty">Search PubMed for references. Results will appear here.</div>
+        <!-- PubMed Search tab -->
+        <div id="reflib-tab-pubmed" style="display:none;padding:14px 18px">
+          <div class="pubmed-search-row">
+            <input type="text" id="pubmed-query" placeholder="Search PubMed (uses topic if blank)..." onkeydown="if(event.key==='Enter')searchPubMed()" />
+            <button class="btn btn-pubmed btn-sm" onclick="searchPubMed()" id="pubmed-btn">Search</button>
+          </div>
+          <div id="pubmed-results" class="pubmed-results">
+            <div class="pubmed-empty">Search PubMed for references. Results will appear here.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -315,6 +339,20 @@
     <div id="sections-container"></div>
     <div style="text-align:center;margin:10px 0 4px">
       <button class="btn btn-outline" onclick="openAddSectionModal()">+ Add Section</button>
+    </div>
+
+    <!-- Paper coherence checker -->
+    <div class="coherence-panel">
+      <div class="coherence-header">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem">🔍 Check Paper Flow</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">AI review of coherence, transitions, and narrative consistency across all sections</div>
+        </div>
+        <button class="btn btn-ai btn-sm" id="coherence-btn" onclick="checkCoherence()">Run Check</button>
+      </div>
+      <div class="coherence-body" id="coherence-body">
+        <div class="coherence-output" id="coherence-output"></div>
+      </div>
     </div>
 
   </div>
@@ -445,6 +483,7 @@ function renderSections() {
         <div class="section-ai-actions">
           <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${titleEsc}')">✨ Generate Draft</button>
           <button class="btn btn-ai btn-sm" onclick="improveSection('${s.id}','${titleEsc}')">✨ Improve</button>
+          <button class="btn btn-outline btn-sm" onclick="expandToProse('${s.id}','${titleEsc}')">✍ Expand to Prose</button>
           <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${titleEsc}')">💡 Key Points</button>
           <button class="btn btn-outline btn-sm" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
         </div>
@@ -634,7 +673,7 @@ function generateDraft(id, title) {
 }
 
 function improveSection(id, title) {
-  const content = state.sections[id];
+  const content = state.sections[id]?.prose;
   if (!content?.trim()) { showToast("Please write something in this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
@@ -643,7 +682,68 @@ function improveSection(id, title) {
 
 function getKeyPoints(id, title) {
   const topic = getTopic();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic }, id, "💡 Key Points to Cover", false);
+  const pubmedContext = getSelectedPubmedContext();
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext }, id, "💡 Key Points to Cover", false);
+}
+
+async function checkCoherence() {
+  const topic = getTopic();
+  if (!topic) { showToast("Set a Medical Topic first.", "error"); return; }
+
+  const filled = SECTIONS.filter(s => state.sections[s.id]?.prose?.trim());
+  if (filled.length < 2) { showToast("Write content in at least 2 sections before checking flow.", "error"); return; }
+
+  const sections = filled.map(s => ({
+    title: s.num ? `${s.num}. ${s.title}` : s.title,
+    prose: state.sections[s.id].prose,
+  }));
+
+  const btn = document.getElementById("coherence-btn");
+  const body = document.getElementById("coherence-body");
+  const output = document.getElementById("coherence-output");
+
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  body.classList.add("visible");
+  output.innerHTML = `<span class="co-loading">✨ Analysing paper flow across ${sections.length} sections...</span>`;
+
+  try {
+    const resp = await fetch("/api/coherence-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, sections }),
+    });
+
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+
+    output.textContent = "";
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output.textContent += decoder.decode(value, { stream: true });
+    }
+  } catch (err) {
+    output.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run Check";
+  }
+}
+
+function expandToProse(id, title) {
+  const prose = state.sections[id]?.prose || "";
+  if (!prose.trim()) { showToast("Paste your bullet points or rough notes into this section first.", "error"); return; }
+  const topic = getTopic();
+  const pubmedContext = getSelectedPubmedContext();
+  streamToAiBox("/api/refine", {
+    topic,
+    sectionTitle: title,
+    currentDraft: prose,
+    instruction: "Convert these bullet points and rough notes into flowing, formal academic prose suitable for a peer-reviewed journal review article. Preserve every piece of information provided, expand key points with appropriate context, add smooth transitions between ideas, and insert [Author et al., Year] citation placeholders where evidence is implied. Do not invent facts not present in the input.",
+    pubmedContext,
+  }, id, "✍ Expanded Prose", true);
 }
 
 function applyAiSuggestion(id) {
@@ -837,18 +937,22 @@ function renderPubmedResults() {
     el.innerHTML = `<div class="pubmed-empty">No results found.</div>`;
     return;
   }
-  el.innerHTML = pubmedArticles.map((a, i) => `
+  el.innerHTML = pubmedArticles.map((a, i) => {
+    const inLibrary = !!state.library.find(e => e.pmid === a.pmid);
+    return `
     <div class="pubmed-article" id="pm-${i}">
       <div class="pubmed-article-title">${htmlEsc(a.title)}</div>
       <div class="pubmed-article-meta">${htmlEsc(a.authors)} &bull; ${htmlEsc(a.journal)} ${htmlEsc(a.year)} &bull; PMID: ${htmlEsc(a.pmid)}</div>
       <div class="pubmed-article-abstract" id="pm-abs-${i}">${htmlEsc(a.abstract || "No abstract available.")}</div>
       ${(a.abstract && a.abstract.length > 200) ? `<span class="pubmed-expand" onclick="toggleAbstract(${i})">Show more</span>` : ""}
-      <div>
-        <button class="btn btn-pubmed btn-sm pubmed-use-btn" onclick="insertReference(${i})">+ Add to References</button>
-        <button class="btn btn-outline btn-sm pubmed-use-btn" onclick="togglePubmedSelect(${i})" id="pm-sel-${i}">Use in AI</button>
+      <div style="margin-top:6px">
+        <button class="btn btn-sm pubmed-use-btn ${inLibrary ? 'btn-secondary' : 'btn-pubmed'}"
+          id="pm-add-${i}" onclick="insertReference(${i})" ${inLibrary ? 'disabled' : ''}>
+          ${inLibrary ? '✓ In Library' : '+ Add to Library'}
+        </button>
       </div>
     </div>
-  `).join("");
+  `}).join("");
 }
 
 function toggleAbstract(i) {
@@ -857,32 +961,8 @@ function toggleAbstract(i) {
   el.nextElementSibling.textContent = isExpanded ? "Show less" : "Show more";
 }
 
-const selectedPubmed = new Set();
-
-function togglePubmedSelect(i) {
-  const btn = document.getElementById(`pm-sel-${i}`);
-  if (selectedPubmed.has(i)) {
-    selectedPubmed.delete(i);
-    btn.textContent = "Use in AI";
-    btn.classList.remove("btn-ai");
-    btn.classList.add("btn-outline");
-  } else {
-    selectedPubmed.add(i);
-    btn.textContent = "✓ Using in AI";
-    btn.classList.remove("btn-outline");
-    btn.classList.add("btn-ai");
-  }
-}
-
 function getSelectedPubmedContext() {
   const parts = [];
-  // From PubMed search results
-  [...selectedPubmed].forEach(i => {
-    const a = pubmedArticles[i];
-    if (!a) return;
-    parts.push(`Title: ${a.title}\nAuthors: ${a.authors}\nJournal: ${a.journal} (${a.year})\nAbstract: ${a.abstract || "N/A"}`);
-  });
-  // From Reference Library (selected entries)
   state.library.filter(e => e.selected).forEach(e => {
     const text = e.fullText || e.abstract || "N/A";
     parts.push(`Title: ${e.title}\nAuthors: ${e.authors}\nJournal: ${e.journal} (${e.year})\nText: ${text.slice(0, 3000)}`);
@@ -893,13 +973,25 @@ function getSelectedPubmedContext() {
 function insertReference(i) {
   const a = pubmedArticles[i];
   if (!a) return;
-  // Add to library if not already there
-  if (!state.library.find(e => e.pmid === a.pmid)) {
-    state.library.push({ ...a, refNumber: state.library.length + 1, selected: true });
-    renderLibrary();
-    scheduleAutoSave();
+  if (state.library.find(e => e.pmid === a.pmid)) {
+    showToast("Already in library.", "");
+    return;
   }
-  // Also append to references section text
+  // Add to library, selected by default so it's active in AI context immediately
+  state.library.push({ ...a, refNumber: state.library.length + 1, selected: true });
+  renderLibrary();
+  scheduleAutoSave();
+
+  // Update button in PubMed results
+  const btn = document.getElementById(`pm-add-${i}`);
+  if (btn) {
+    btn.textContent = "✓ In Library";
+    btn.disabled = true;
+    btn.classList.remove("btn-pubmed");
+    btn.classList.add("btn-secondary");
+  }
+
+  // Append to references section text
   if (!state.sections["references"]) state.sections["references"] = { prose: "", tables: [] };
   const ref = `${a.authors}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}.`;
   const current = state.sections["references"].prose || "";
@@ -913,7 +1005,7 @@ function insertReference(i) {
   updateTotalWordCount();
   updatePreview();
   scheduleAutoSave();
-  showToast("Reference added!", "success");
+  showToast("Added to library!", "success");
 }
 
 // ── Toast ──
@@ -931,6 +1023,14 @@ function toggleRefLib() {
   const open = body.style.display === "none";
   body.style.display = open ? "block" : "none";
   chevron.style.transform = open ? "rotate(90deg)" : "";
+}
+
+function switchRefTab(e, tab) {
+  e.stopPropagation();
+  document.getElementById("reflib-tab-references").style.display = tab === "references" ? "block" : "none";
+  document.getElementById("reflib-tab-pubmed").style.display = tab === "pubmed" ? "block" : "none";
+  document.querySelectorAll(".reflib-tab").forEach(el => el.classList.remove("active"));
+  e.target.classList.add("active");
 }
 
 async function fetchPmids() {
