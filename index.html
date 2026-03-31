@@ -264,6 +264,8 @@
     .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 460px; max-width: 92vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
     .modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
     .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .suggestion-chip { background: var(--ai-light); border: 1px solid var(--ai-border); color: var(--ai); border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
+    .suggestion-chip:hover { background: var(--ai); color: #fff; }
   </style>
 </head>
 <body>
@@ -405,7 +407,12 @@
 <!-- Add Section Modal -->
 <div class="modal-overlay" id="add-section-modal">
   <div class="modal-box">
-    <div class="modal-title">Add Custom Section</div>
+    <div class="modal-title">Add Section</div>
+    <div id="section-suggestions-area" style="margin-bottom:12px;display:none">
+      <div style="font-size:0.8rem;font-weight:500;color:var(--secondary);margin-bottom:6px">AI suggestions for <span id="suggestions-topic-label"></span>:</div>
+      <div id="section-suggestion-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <div id="section-suggestions-loading" style="font-size:0.8rem;color:var(--ai);font-style:italic;margin-bottom:10px;display:none">✨ Loading suggestions...</div>
     <div class="form-group">
       <label>Section Title</label>
       <input type="text" id="new-section-title" placeholder="e.g. Biomarkers &amp; Liquid Biopsy" onkeydown="if(event.key==='Enter')confirmAddSection()" />
@@ -1265,7 +1272,7 @@ function syncReferencesSection() {
 }
 
 // ── Custom Sections ──
-function openAddSectionModal() {
+async function openAddSectionModal() {
   const sel = document.getElementById("new-section-position");
   sel.innerHTML = SECTIONS
     .filter(s => s.id !== "references")
@@ -1273,8 +1280,41 @@ function openAddSectionModal() {
     `<option value="__end__">At end (before References)</option>`;
   sel.value = "__end__";
   document.getElementById("new-section-title").value = "";
+  document.getElementById("section-suggestions-area").style.display = "none";
+  document.getElementById("section-suggestion-chips").innerHTML = "";
   document.getElementById("add-section-modal").classList.add("open");
   setTimeout(() => document.getElementById("new-section-title").focus(), 50);
+
+  const topic = getTopic();
+  if (!topic) return;
+
+  document.getElementById("section-suggestions-loading").style.display = "block";
+  try {
+    const existingSections = SECTIONS.filter(s => s.id !== "references").map(s => s.title);
+    const resp = await fetch("/api/suggest-sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, existingSections }),
+    });
+    if (!resp.ok) throw new Error("suggestion request failed");
+    const { suggestions } = await resp.json();
+    if (suggestions?.length) {
+      document.getElementById("suggestions-topic-label").textContent = topic;
+      document.getElementById("section-suggestion-chips").innerHTML = suggestions
+        .map(s => `<button class="suggestion-chip" onclick="pickSuggestion(${JSON.stringify(s)})">${htmlEsc(s)}</button>`)
+        .join("");
+      document.getElementById("section-suggestions-area").style.display = "block";
+    }
+  } catch {
+    // Suggestions are non-critical — silently skip on error
+  } finally {
+    document.getElementById("section-suggestions-loading").style.display = "none";
+  }
+}
+
+function pickSuggestion(title) {
+  document.getElementById("new-section-title").value = title;
+  document.getElementById("new-section-title").focus();
 }
 
 function closeAddSectionModal() {

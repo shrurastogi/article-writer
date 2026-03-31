@@ -783,6 +783,45 @@ Be direct and specific. Do not pad with generic praise.`;
   }
 });
 
+// Suggest relevant section names for a review article
+app.post("/api/suggest-sections", async (req, res) => {
+  const { topic, existingSections } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+
+  const existing = Array.isArray(existingSections) && existingSections.length
+    ? `\nThe article already has these sections: ${existingSections.join(", ")}. Do not suggest duplicates.`
+    : "";
+
+  const prompt = `You are a medical writing expert helping to structure a peer-reviewed review article on "${topic.trim()}".${existing}
+
+List 6–8 recommended thematic section titles for the Main Body of this review article. These should be specific to the topic and cover the most important clinical and scientific areas.
+
+Return ONLY a JSON array of strings — no explanation, no markdown, no numbering. Example format:
+["Epidemiology & Incidence", "Pathophysiology", "Diagnostic Criteria", "Treatment Approaches", "Emerging Therapies", "Prognosis & Outcomes"]`;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: MODEL,
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() || "[]";
+    // Extract the JSON array even if the model adds surrounding text
+    const match = raw.match(/\[[\s\S]*\]/);
+    const suggestions = match ? JSON.parse(match[0]) : [];
+    if (!Array.isArray(suggestions)) throw new Error("Unexpected response shape");
+    res.json({ suggestions: suggestions.slice(0, 10) });
+  } catch (err) {
+    logger.error({ msg: "Groq API error in suggest-sections", error: err.message });
+    res.status(500).json({ error: "Failed to generate suggestions: " + err.message });
+  }
+});
+
 // Only bind to a port when run directly (node server.js / npm start).
 // When required by tests, export the app so supertest can attach without a port.
 if (require.main === module) {

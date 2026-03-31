@@ -98,6 +98,27 @@ Generate an HTML table for a section.
 
 ---
 
+### POST /api/suggest-sections
+Suggest relevant section titles for the Main Body of a review article.
+
+**Request**
+```json
+{
+  "topic": "string (required) — medical topic",
+  "existingSections": ["string"] 
+}
+```
+`existingSections` is optional; when supplied, the AI avoids suggesting duplicates.
+
+**Response**
+```json
+{ "suggestions": ["string"] }
+```
+Returns up to 10 section title strings ranked by relevance.
+**Errors:** `400` missing topic; `500` LLM failure.
+
+---
+
 ### POST /api/coherence-check
 Review the full article for flow and narrative consistency.
 
