@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | Product | Medical Article Writer |
-| Version | 1.0 |
+| Version | 1.1 |
 | Last Updated | 2026-03-31 |
 | Status | Living Document |
 
@@ -19,7 +19,7 @@
 
 Medical Article Writer is a browser-based AI writing tool that helps clinicians, researchers, and medical writers compose structured, peer-reviewed review articles. It provides a structured section editor, AI draft generation grounded in real PubMed literature, reference management, and professional export to PDF and Word.
 
-The app runs as a lightweight Node/Express server with a single-file frontend. No accounts, no cloud storage — work is auto-saved to the browser.
+The app runs as a lightweight Node/Express server with a single-file frontend. Users sign in with Google to access a personal dashboard where all their articles are saved server-side and accessible across devices.
 
 ---
 
@@ -56,6 +56,7 @@ Writing a first review article as part of training. Needs structural scaffolding
 | All AI output grounded in real literature | 100% of generated content uses PubMed abstracts or full-text as context when papers are selected |
 | Export ready for journal submission | DOCX and PDF output require no manual reformatting |
 | Zero data loss | Auto-save ensures work is never lost on accidental close |
+| Article history | Users can access all previously created articles from any device after sign-in |
 
 ---
 
@@ -269,6 +270,38 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 ---
 
+### UF-11: Sign In with Google
+
+1. User visits the app URL
+2. If not authenticated, redirected to login page
+3. Click **Sign in with Google**
+4. Google OAuth consent screen — user grants permission
+5. Redirected back to the app, session established
+6. Lands on the article dashboard (UF-12)
+
+---
+
+### UF-12: View and Manage Articles (Dashboard)
+
+1. After sign-in, user sees a grid/list of all their articles
+2. Each card shows: article title (or "Untitled"), medical topic, last updated date, total word count
+3. Click any card → opens the article in the editor
+4. Click **+** → creates a new blank article and opens the editor (UF-13)
+5. Click the delete icon on a card → confirmation dialog → article permanently deleted
+
+---
+
+### UF-13: Create a New Article
+
+1. From the dashboard, click the **+** (New Article) button
+2. A new blank article is created server-side with a default title "Untitled Article"
+3. Editor opens with all 13 sections empty
+4. User fills in Medical Topic, Title, Authors, Keywords
+5. Changes auto-save to the server every 1500ms
+6. User can return to the dashboard at any time; the article persists under their account
+
+---
+
 ## 7. Technical Constraints
 
 | Constraint | Detail |
@@ -276,7 +309,8 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | Runtime | Node.js v18+ |
 | AI Provider | Groq API (`llama-3.3-70b-versatile`). Requires `GROQ_API_KEY` in `.env` |
 | PubMed | NCBI E-utilities (free). Optional `NCBI_API_KEY` raises rate limit from 3 to 10 req/s |
-| Storage | Browser `localStorage` only. No server-side persistence |
+| Storage | Currently `localStorage` only. Planned: server-side DB per user account (see F11-3). TBD: MongoDB vs PostgreSQL vs SQLite |
+| Auth | Planned: Google OAuth 2.0 via Passport.js or similar. Requires `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `.env` |
 | Streaming | All AI endpoints use chunked transfer encoding (`text/plain`) |
 | PDF | Client-side only via `html2pdf.js` CDN. No server involvement |
 | DOCX | Server-side via `docx` npm package |
@@ -286,11 +320,49 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 ## 8. Known Limitations
 
-- `localStorage` cap (~5MB) limits total article size including library
+- `localStorage` cap (~5MB) limits total article size including library *(resolved by F11-3 server-side storage)*
+- No multi-user or collaboration support *(partially resolved by F10/F11 — each user has isolated articles)*
 - OA full-text availability depends on PMC Open Access Subset; most articles provide abstract only
 - Citation matching (`[Author et al., Year]`) is fuzzy — relies on surname + year; disambiguation not supported
-- No multi-user or collaboration support
 - No version history beyond 5-step refinement undo within a session
+
+---
+
+### Module F10 — User Authentication
+
+| ID | Feature | Description | Status |
+|---|---|---|---|
+| F10-1 | Google Sign-in | OAuth 2.0 login via Google. Users authenticate with their Google account — no separate password | 📋 |
+| F10-2 | Session management | Server-side session persists login state. Auto-redirect to login page if unauthenticated | 📋 |
+| F10-3 | Sign-out | Clear session and redirect to login page | 📋 |
+| F10-4 | User identity in header | Display signed-in user's name and avatar (from Google profile) in the app header | 📋 |
+
+---
+
+### Module F11 — Article Management
+
+| ID | Feature | Description | Status |
+|---|---|---|---|
+| F11-1 | Article dashboard | Landing page after login showing all articles belonging to the user. Displays article title, topic, last updated date, and word count | 📋 |
+| F11-2 | New article button | "+" button on the dashboard to create a new blank article and open it in the editor | 📋 |
+| F11-3 | Server-side article storage | Each article (sections, metadata, library, custom sections) stored server-side linked to the user's account. Replaces localStorage as the persistence layer | 📋 |
+| F11-4 | Auto-save to server | On every change, article state is persisted to the server (debounced, same 1500ms pattern). localStorage used as a fallback write-behind cache | 📋 |
+| F11-5 | Open existing article | Click any article on the dashboard to open it in the editor | 📋 |
+| F11-6 | Delete article | Delete an article from the dashboard with confirmation. Permanently removes all sections, library, and tables | 📋 |
+| F11-7 | Article last-updated timestamp | Each article card on the dashboard shows when it was last edited | 📋 |
+
+---
+
+### Module F12 — Testing & Quality
+
+| ID | Feature | Description | Status |
+|---|---|---|---|
+| F12-1 | Unit tests for server endpoints | Jest test suite covering all `/api/*` endpoints with mocked Groq and NCBI calls. Validates request validation, error handling, and response shape | 📋 |
+| F12-2 | Unit tests for frontend utilities | Tests for `parsePubMedXML`, `enhanceCitations`, `getSelectedPubmedContext`, `wordCount`, and `htmlEsc` functions | 📋 |
+| F12-3 | Integration tests for PubMed pipeline | Tests for the full PMID fetch → enrich → parse flow with recorded NCBI fixture responses | 📋 |
+| F12-4 | E2E tests for critical user flows | Playwright tests covering: article creation, section generate/apply, add to library, PDF/DOCX export, Google login flow | 📋 |
+| F12-5 | CI pipeline — test gate | GitHub Actions workflow that runs the full test suite on every PR. PRs cannot be merged if tests fail | 📋 |
+| F12-6 | CI pipeline — lint gate | ESLint run on every PR to catch syntax errors and undefined references before merge | 📋 |
 
 ---
 
@@ -329,6 +401,11 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 |---|---|---|---|
 | Q1 | Should the topic field lock the article to a specific disease (e.g. MM) or remain fully general? | 2026-03-31 | Remains general — topic field used to guide AI, not enforce structure |
 | Q2 | Should "Add to Library" auto-open the References tab to confirm the addition? | 2026-03-31 | Open |
+| Q3 | Which database for server-side article storage? MongoDB (flexible JSON), PostgreSQL (relational, strong consistency), or SQLite (zero-infra, single-file)? | 2026-03-31 | Open |
+| Q4 | Should auto-save to server be a full-article overwrite or a diff/patch? Full overwrite is simpler; diff reduces bandwidth for large articles | 2026-03-31 | Open |
+| Q5 | Should the dashboard support article search/filter (by topic, date, word count)? | 2026-03-31 | Open |
+| Q6 | Which test framework for E2E? Playwright (recommended — better WSL support) vs Cypress | 2026-03-31 | Open |
+| Q7 | Should Google login be the only auth method, or also support email/password as fallback? | 2026-03-31 | Open |
 
 ---
 
@@ -339,3 +416,6 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | 2026-03-31 | Merged "Use in AI" + "Add to References" into single "Add to Library" button | Two parallel AI context flows (in-memory Set vs. persistent library) were fragile and confusing. Library is single source of truth |
 | 2026-03-31 | PubMed Search moved into Reference Library as a tab | Reduces panel count; reinforces that search → library is the intended flow |
 | 2026-03-31 | Key Points uses selected library papers as context | Makes Key Points actionable based on the author's actual evidence base, not just general knowledge |
+| 2026-03-31 | Google OAuth chosen over email/password for initial auth | Eliminates password management complexity; target users (clinicians, researchers) universally have Google accounts |
+| 2026-03-31 | Server-side storage replaces localStorage as persistence layer | localStorage is device-bound and capped at ~5MB; server-side storage enables multi-device access and removes the size constraint |
+| 2026-03-31 | Test gate added to PR process (F12-5) | Prevents regressions as the codebase grows beyond two files; critical before adding auth and database layers |
