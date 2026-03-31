@@ -439,20 +439,27 @@
 <script>
 // ── Section definitions ──
 let SECTIONS = [
-  { id: "abstract",         num: "",    title: "Abstract",                              placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)...",  isCustom: false },
-  { id: "introduction",     num: "1",   title: "Introduction",                          placeholder: "Disease background, clinical burden, rationale for the review...",               isCustom: false },
-  { id: "epidemiology",     num: "2",   title: "Epidemiology & Risk Factors",           placeholder: "Incidence, prevalence, demographic trends, risk factors...",                    isCustom: false },
-  { id: "pathophysiology",  num: "3",   title: "Pathophysiology & Molecular Biology",   placeholder: "Clonal plasma cell proliferation, genetic alterations, tumor microenvironment...", isCustom: false },
-  { id: "diagnosis",        num: "4",   title: "Clinical Presentation & Diagnosis",     placeholder: "CRAB/SLiM-CRAB criteria, diagnostic workup, imaging...",                       isCustom: false },
-  { id: "staging",          num: "5",   title: "Staging & Risk Stratification",         placeholder: "ISS, R-ISS, cytogenetic risk categories...",                                    isCustom: false },
-  { id: "treatment_nd",     num: "6",   title: "Treatment: Newly Diagnosed MM",         placeholder: "Transplant-eligible vs ineligible pathways, induction, ASCT, maintenance...",  isCustom: false },
-  { id: "treatment_rr",     num: "7",   title: "Treatment: Relapsed/Refractory MM",     placeholder: "Salvage regimens, drug sequencing, landmark trials...",                         isCustom: false },
-  { id: "novel_therapies",  num: "8",   title: "Novel Therapies & Emerging Treatments", placeholder: "CAR-T cells, bispecific antibodies, novel targets, ADCs...",                   isCustom: false },
-  { id: "supportive_care",  num: "9",   title: "Supportive Care & Complications",       placeholder: "Bone disease, renal failure, infections, VTE, anemia management...",            isCustom: false },
-  { id: "future_directions",num: "10",  title: "Future Directions",                     placeholder: "MRD-guided therapy, ongoing trials, research priorities...",                    isCustom: false },
-  { id: "conclusion",       num: "11",  title: "Conclusion",                            placeholder: "Summary of advances, remaining challenges, clinical implications...",           isCustom: false },
-  { id: "references",       num: "",    title: "References",                            placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ...",                  isCustom: false },
+  { id: "abstract",     num: "",  title: "Abstract",     placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)...", isCustom: false },
+  { id: "introduction", num: "1", title: "Introduction", placeholder: "Disease background, clinical burden, rationale for the review...", isCustom: false },
+  { id: "main_body",    num: "2", title: "Main Body",    placeholder: "Use + Add Section to insert thematic subsections (e.g. Epidemiology, Pathophysiology, Diagnosis, Treatment).\n\nAlternatively write general overview content here...", isCustom: false },
+  { id: "discussion",   num: "3", title: "Discussion",   placeholder: "Synthesis of evidence, clinical implications, limitations, comparison with existing reviews...", isCustom: false },
+  { id: "conclusions",  num: "4", title: "Conclusions",  placeholder: "Summary of key findings, remaining challenges, future directions, clinical take-aways...", isCustom: false },
+  { id: "references",   num: "",  title: "References",   placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ...", isCustom: false },
 ];
+
+// Legacy section IDs for articles created before the Sprint 2 section restructure.
+// Used in applyArticleData to migrate old content into custom sections.
+const LEGACY_TITLES = {
+  epidemiology:      "Epidemiology & Risk Factors",
+  pathophysiology:   "Pathophysiology & Molecular Biology",
+  diagnosis:         "Clinical Presentation & Diagnosis",
+  staging:           "Staging & Risk Stratification",
+  treatment_nd:      "Treatment: Newly Diagnosed",
+  treatment_rr:      "Treatment: Relapsed/Refractory",
+  novel_therapies:   "Novel Therapies & Emerging Treatments",
+  supportive_care:   "Supportive Care & Complications",
+  future_directions: "Future Directions",
+};
 
 // ── State ──
 const state = {
@@ -958,6 +965,8 @@ function applyArticleData(data) {
   if (data.title) document.getElementById("article-title").value = data.title;
   if (data.authors) document.getElementById("authors").value = data.authors;
   if (data.keywords) document.getElementById("keywords").value = data.keywords;
+
+  // Restore previously saved custom sections
   if (data.customSections?.length) {
     const refIdx = SECTIONS.findIndex(s => s.id === "references");
     for (const cs of data.customSections) {
@@ -966,13 +975,33 @@ function applyArticleData(data) {
       }
     }
   }
+
   if (data.sections) {
+    // `conclusion` (old key) maps to `conclusions` (new key)
+    const LEGACY_REMAP = { conclusion: "conclusions" };
+    const knownIds = new Set(SECTIONS.map(s => s.id));
+    const refIdx = SECTIONS.findIndex(s => s.id === "references");
+
     for (const [id, val] of Object.entries(data.sections)) {
-      state.sections[id] = typeof val === "string" ? { prose: val, tables: [] } : (val || { prose: "", tables: [] });
-      const el = document.getElementById(`content-${id}`);
-      if (el) el.value = state.sections[id].prose || "";
+      const prose = typeof val === "string" ? val : (val?.prose || "");
+      const tables = typeof val === "object" ? (val?.tables || []) : [];
+      const targetId = LEGACY_REMAP[id] || id;
+
+      if (knownIds.has(targetId)) {
+        // Known section (possibly remapped from a legacy key)
+        state.sections[targetId] = { prose, tables };
+      } else if (prose.trim() || tables.length) {
+        // Unknown legacy section with content — restore as a custom section
+        if (!SECTIONS.find(s => s.id === id)) {
+          const title = LEGACY_TITLES[id] || id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          SECTIONS.splice(refIdx, 0, { id, num: "", title, placeholder: `Write about ${title}...`, isCustom: true });
+          knownIds.add(id);
+        }
+        state.sections[id] = { prose, tables };
+      }
     }
   }
+
   if (data.library?.length) {
     state.library = data.library;
     renderLibrary();
