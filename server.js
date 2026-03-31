@@ -773,8 +773,14 @@ Be direct and specific. Do not pad with generic praise.`;
   }
 });
 
-app.listen(PORT, () => {
-  logger.info(`Medical Article Writer running at http://localhost:${PORT}`);
-  logger.info(`Groq API key:  ${process.env.GROQ_API_KEY ? "✓ Loaded" : "✗ MISSING — add GROQ_API_KEY to .env"}`);
-  logger.info(`NCBI API key:  ${NCBI_API_KEY ? "✓ Loaded (10 req/s)" : "not set — anonymous rate limit (3 req/s)"}`);
-});
+// Only bind to a port when run directly (node server.js / npm start).
+// When required by tests, export the app so supertest can attach without a port.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`Medical Article Writer running at http://localhost:${PORT}`);
+    logger.info(`Groq API key:  ${process.env.GROQ_API_KEY ? "✓ Loaded" : "✗ MISSING — add GROQ_API_KEY to .env"}`);
+    logger.info(`NCBI API key:  ${NCBI_API_KEY ? "✓ Loaded (10 req/s)" : "not set — anonymous rate limit (3 req/s)"}`);
+  });
+}
+
+module.exports = app;
