@@ -6,5 +6,5 @@ module.exports = {
   collectCoverageFrom: ["routes/**/*.js", "lib/**/*.js", "middleware/**/*.js", "models/**/*.js"],
   globalSetup: "./tests/globalSetup.js",
   globalTeardown: "./tests/globalTeardown.js",
-  setupFilesAfterFramework: ["./tests/jestSetup.js"],
+  setupFiles: ["./tests/jestSetup.js"],
 };
