@@ -18,7 +18,7 @@ Generate a full section draft.
 ```json
 {
   "topic": "string (required) — medical topic",
-  "sectionId": "string (required) — one of the 13 section IDs",
+  "sectionId": "string (required) — a section ID (standard or custom)",
   "sectionTitle": "string (required)",
   "notes": "string (optional) — author hints",
   "pubmedContext": "string (optional) — selected abstracts/full-text"
