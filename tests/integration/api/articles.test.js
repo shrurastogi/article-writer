@@ -1,6 +1,7 @@
 /**
  * Integration tests for /api/articles endpoints.
- * Requires a running MongoDB instance (set TEST_MONGODB_URI or MONGODB_URI).
+ * MongoDB is provided by mongodb-memory-server (via jest globalSetup in tests/setup.js)
+ * or by MONGODB_URI if already set in the environment (e.g. CI mongo:7 service).
  */
 
 const request = require("supertest");
@@ -10,10 +11,7 @@ const Article = require("../../../models/article");
 
 process.env.NODE_ENV = "test";
 process.env.SESSION_SECRET = "test-secret";
-process.env.MONGODB_URI =
-  process.env.TEST_MONGODB_URI ||
-  process.env.MONGODB_URI ||
-  "mongodb://localhost:27017/article-writer-test";
+// MONGODB_URI is set by globalSetup (in-memory) or inherited from CI environment
 
 let app;
 beforeAll(async () => {
