@@ -253,10 +253,15 @@
     .coherence-body { padding: 16px 18px; display: none; }
     .coherence-body.visible { display: block; }
     .coherence-output {
-      white-space: pre-wrap; font-size: 0.85rem; line-height: 1.7;
+      font-size: 0.85rem; line-height: 1.7;
       color: var(--text); max-height: 500px; overflow-y: auto;
     }
     .coherence-output .co-loading { color: var(--ai); font-style: italic; }
+    .co-heading { font-weight: 700; font-size: 0.9rem; margin-top: 14px; margin-bottom: 6px; color: var(--gsk-navy); }
+    .co-block { white-space: pre-wrap; margin-bottom: 6px; }
+    .co-rec-card { display: flex; gap: 10px; background: var(--ai-light); border: 1px solid var(--ai-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+    .co-rec-num { font-weight: 700; color: var(--ai); font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
+    .co-rec-body { flex: 1; font-size: 0.84rem; }
 
     /* ── Modals ── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; }
@@ -765,17 +770,95 @@ async function checkCoherence() {
     output.textContent = "";
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
+    let accumulated = "";
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      output.textContent += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      accumulated += chunk;
+      output.textContent += chunk;
     }
+    // Re-render with interactive "Apply to Section" buttons on recommendations
+    renderCoherenceWithActions(accumulated);
   } catch (err) {
     output.innerHTML = `<span style="color:#ef4444">Error: ${err.message}</span>`;
   } finally {
     btn.disabled = false;
     btn.textContent = "Run Check";
   }
+}
+
+// Parse the coherence output and add "Apply to Section" buttons to each recommendation
+function renderCoherenceWithActions(text) {
+  const output = document.getElementById("coherence-output");
+  const blocks = text.split(/(^## .+)/m).filter(s => s.trim());
+  let html = "";
+  let inRecs = false;
+
+  for (const block of blocks) {
+    if (block.startsWith("## ")) {
+      const heading = htmlEsc(block.replace(/^## /, "").trim());
+      inRecs = heading.toLowerCase().startsWith("recommendation");
+      html += `<div class="co-heading">${heading}</div>`;
+    } else if (inRecs) {
+      for (const line of block.trim().split("\n")) {
+        const recMatch = line.match(/^(\d+)\.\s+(.+)/);
+        if (recMatch) {
+          const recText = recMatch[2].trim();
+          const sectionId = inferSectionFromText(recText);
+          const section = sectionId ? SECTIONS.find(s => s.id === sectionId) : null;
+          const btnHtml = section
+            ? `<button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:0.75rem" onclick="applyFlowRecommendation('${section.id}', ${JSON.stringify(recText)})">Apply to ${htmlEsc(section.title)} ↗</button>`
+            : "";
+          html += `<div class="co-rec-card"><div class="co-rec-num">${recMatch[1]}.</div><div class="co-rec-body"><div>${htmlEsc(recText)}</div>${btnHtml}</div></div>`;
+        } else if (line.trim()) {
+          html += `<div style="margin-bottom:4px">${htmlEsc(line)}</div>`;
+        }
+      }
+    } else {
+      html += `<div class="co-block">${htmlEsc(block.trim())}</div>`;
+    }
+  }
+
+  output.innerHTML = html;
+}
+
+// Match a recommendation sentence to a section ID by looking for section title keywords
+function inferSectionFromText(text) {
+  const lower = text.toLowerCase();
+  let best = null;
+  let bestLen = 0;
+  for (const s of SECTIONS) {
+    const t = s.title.toLowerCase();
+    if (lower.includes(t) && t.length > bestLen) {
+      best = s.id;
+      bestLen = t.length;
+    }
+  }
+  return best;
+}
+
+// Open a section and immediately stream a refinement using the given recommendation as instruction
+function applyFlowRecommendation(sectionId, instruction) {
+  const prose = state.sections[sectionId]?.prose?.trim();
+  const section = SECTIONS.find(s => s.id === sectionId);
+  if (!prose) {
+    showToast(`Add content to the ${section?.title || sectionId} section first, then apply the recommendation.`, "error");
+    return;
+  }
+  // Scroll to and expand the section
+  const panel = document.getElementById(`section-${sectionId}`);
+  if (panel) {
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    panel.classList.add("open");
+  }
+  streamToAiBox("/api/refine", {
+    topic: getTopic(),
+    sectionTitle: section?.title || sectionId,
+    currentDraft: prose,
+    instruction,
+    pubmedContext: getSelectedPubmedContext(),
+  }, sectionId, "↺ Flow Recommendation", true);
 }
 
 function expandToProse(id, title) {
