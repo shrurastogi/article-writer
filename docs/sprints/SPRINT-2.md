@@ -1,7 +1,7 @@
 # Sprint 2 — Infrastructure & Environment Setup
 
-**Status:** Planned  
-**Dates:** TBD  
+**Status:** In Progress  
+**Dates:** 2026-04-04 (started)  
 **Priority tier:** Critical — do before any feature work  
 
 > **Note:** This sprint replaces the previous SPRINT-2 (Core UX Overhaul), which has been
@@ -139,3 +139,26 @@ These require browser/console access and cannot be done by Claude automatically.
 - [ ] No existing functionality broken (manual smoke test: login, create article, AI generate, export DOCX)
 
 **Effort:** ~1 day coding + 2–3 hours manual setup (Atlas, Railway, Google OAuth, GitHub branch protection)
+
+---
+
+## Progress (as of 2026-04-04)
+
+### PRs Raised
+
+| PR | Branch | Status |
+|---|---|---|
+| [#24](https://github.com/shrurastogi/article-writer/pull/24) | `chore/git-branching` | Open — awaiting merge |
+| [#25](https://github.com/shrurastogi/article-writer/pull/25) | `chore/dev-prod-env` | Open — awaiting merge |
+| [#26](https://github.com/shrurastogi/article-writer/pull/26) | `chore/semantic-release` | Open — awaiting merge |
+| [#27](https://github.com/shrurastogi/article-writer/pull/27) | `chore/ci-cd` | Open — awaiting merge |
+
+Merge order: #24 → #25 → #26 → #27. After #24 merges it creates the `dev` branch; remaining PRs should be retargeted to `dev`.
+
+### Manual Setup Remaining
+
+- [ ] MongoDB Atlas — two M0 clusters (`article-writer-dev`, `article-writer-prod`)
+- [ ] Railway — two projects connected to GitHub (`dev` branch → dev project, `main` → prod)
+- [ ] Google OAuth — add Railway dev + prod callback URIs
+- [ ] GitHub branch protection — `main` and `dev`
+- [ ] GitHub Secrets — `RAILWAY_TOKEN_DEV`, `RAILWAY_TOKEN_PROD`, `NPM_TOKEN`
