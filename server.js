@@ -64,6 +64,14 @@ app.use(express.static(path.join(__dirname), { index: false }));
 app.use("/auth", authRouter);
 app.use("/api/articles", articlesRouter);
 
+app.get("/api/version", (req, res) => {
+  res.json({
+    version: process.env.npm_package_version,
+    env: process.env.NODE_ENV || "development",
+    sha: process.env.BUILD_SHA || "local",
+  });
+});
+
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: "https://api.groq.com/openai/v1",
@@ -825,7 +833,17 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 
 // Only bind to a port when run directly (node server.js / npm start).
 // When required by tests, export the app so supertest can attach without a port.
+const REQUIRED_ENV_VARS = ["GROQ_API_KEY", "MONGODB_URI", "SESSION_SECRET"];
+
+function validateEnv() {
+  const missing = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(", ")}. Check your .env file.`);
+  }
+}
+
 if (require.main === module) {
+  validateEnv();
   app.listen(PORT, () => {
     logger.info(`Medical Article Writer running at http://localhost:${PORT}`);
     logger.info(`Groq API key:  ${process.env.GROQ_API_KEY ? "✓ Loaded" : "✗ MISSING — add GROQ_API_KEY to .env"}`);
@@ -833,4 +851,5 @@ if (require.main === module) {
   });
 }
 
+app.validateEnv = validateEnv;
 module.exports = app;
