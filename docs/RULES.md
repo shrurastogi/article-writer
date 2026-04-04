@@ -14,6 +14,20 @@ These rules apply to all contributors and to every Claude Code session working i
 - Every PR must pass the CI test and lint gates before merge (see Section 6).
 - Delete the branch after the PR is merged.
 
+### Release Flow
+
+```
+feature/* or chore/* or fix/*
+        ↓ PR
+       dev  ← integration branch; auto-deploys to Railway dev
+        ↓ PR (when ready to release)
+       main ← production; triggers semantic-release + Railway prod deploy
+```
+
+- All day-to-day work merges into `dev`, not `main`.
+- Merges to `main` trigger `semantic-release`, which reads conventional commits since the last release and bumps the version automatically.
+- Never merge directly to `main` without going through `dev` first (except Sprint 2 setup PRs that establish the `dev` branch itself).
+
 ### Conventional Commit Format (required for semantic-release)
 
 All commits **must** use the conventional commit format. `semantic-release` reads commit messages to determine the next version number automatically. Non-conforming commits are ignored by the version bump logic.
