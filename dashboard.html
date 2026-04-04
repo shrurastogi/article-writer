@@ -516,7 +516,7 @@
         'padding:2px 8px', 'border-radius:10px', 'pointer-events:none',
         isDev ? 'background:#1d4ed8;color:#fff;opacity:0.8' : 'background:#6b7280;color:#fff;opacity:0.6'
       ].join(';');
-      badge.textContent = `v${v.version} · ${String(v.sha).slice(0, 7)}`;
+      badge.textContent = isDev ? `v${v.version} · dev` : `v${v.version}`;
       document.body.appendChild(badge);
     }).catch(() => {});
   </script>
