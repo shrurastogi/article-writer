@@ -1582,6 +1582,19 @@ function enhanceCitations(text, library) {
     return `<span class="cite-unmatched" title="Not found in Reference Library">${match}</span>`;
   });
 }
+
+fetch('/api/version').then(r => r.json()).then(v => {
+  const isDev = v.env !== 'production';
+  const badge = document.createElement('div');
+  badge.id = 'version-badge';
+  badge.style.cssText = [
+    'position:fixed', 'bottom:8px', 'right:12px', 'font-size:11px',
+    'padding:2px 8px', 'border-radius:10px', 'pointer-events:none',
+    isDev ? 'background:#1d4ed8;color:#fff;opacity:0.8' : 'background:#6b7280;color:#fff;opacity:0.6'
+  ].join(';');
+  badge.textContent = `v${v.version} · ${String(v.sha).slice(0, 7)}`;
+  document.body.appendChild(badge);
+}).catch(() => {});
 </script>
 </body>
 </html>
