@@ -1,4 +1,5 @@
-require("dotenv").config();
+const envFile = process.env.NODE_ENV === "production" ? ".env" : `.env.${process.env.NODE_ENV ?? "development"}`;
+require("dotenv").config({ path: envFile });
 const express = require("express");
 const path = require("path");
 const OpenAI = require("openai");
