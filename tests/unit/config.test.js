@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = "test-secret";
 process.env.MONGODB_URI = "mongodb://localhost:27017/test";
 process.env.GROQ_API_KEY = "test-key";
 
-const { validateEnv } = require("../../server");
+const { validateEnv } = require("../../src/config");
 
 describe("validateEnv", () => {
   const REQUIRED = ["GROQ_API_KEY", "MONGODB_URI", "SESSION_SECRET"];

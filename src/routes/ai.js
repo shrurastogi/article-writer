@@ -3,7 +3,7 @@
 const router = require("express").Router();
 const { getClient, MODEL } = require("../services/llmService");
 const { getSectionContext } = require("../services/sectionContext");
-const logger = require("../../lib/logger");
+const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
