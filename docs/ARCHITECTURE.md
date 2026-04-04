@@ -2,75 +2,194 @@
 
 ---
 
+## Document Info
+
+| Field | Value |
+|---|---|
+| Version | 2.0 |
+| Last Updated | 2026-04-04 |
+| Reflects | Sprint 1 delivered state |
+
+This document describes the **current** architecture. It is updated when the structure changes — not when features are planned. The Sprint 3 refactor will produce a major update; the Sprint 3 target structure is documented in `docs/sprints/SPRINT-3.md`.
+
+---
+
 ## 1. System Overview
 
-Medical Article Writer is a **two-file, no-build full-stack application**. There is no bundler, no framework, no database, and no authentication layer. The entire product ships as:
+Medical Article Writer is a multi-user Node/Express web application backed by MongoDB Atlas and deployed on Railway. Users authenticate with Google OAuth or email/password and access a personal dashboard of articles stored server-side.
+
+Current file structure after Sprint 1:
 
 ```
 article-writer/
-├── server.js       # Express API server
-├── index.html      # Complete frontend (HTML + CSS + JS, all inline)
+├── server.js           # Express app: all routes, middleware, DB connection, Passport config
+├── login.html          # Unauthenticated entry point — Google + email/password sign-in
+├── dashboard.html      # Post-auth landing page — article grid with CRUD actions
+├── index.html          # Article editor — section editing, AI, references, export UI
+├── assets/
+│   └── gsk-logo.svg
 ├── package.json
-└── .env            # API keys (not committed)
+├── jest.config.js
+├── .env                # Production secrets (gitignored)
+├── .env.development    # Local dev overrides (gitignored)
+└── .env.example        # Documented template (tracked in git)
 ```
 
-The server serves `index.html` as a static file and exposes a set of JSON/streaming API endpoints. The frontend is a single self-contained file with all styles and logic inline.
+> **Sprint 3 target:** `server.js` will be split into `src/routes/`, `src/controllers/`, `src/services/`, `src/models/`, `src/middleware/`, `src/utils/`, `src/config/`. Inline CSS/JS in `index.html` extracted to `public/style.css` and `public/app.js`. See `docs/sprints/SPRINT-3.md`.
 
 ---
 
 ## 2. Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Browser                              │
-│                                                             │
-│  ┌──────────────────────┐   ┌───────────────────────────┐  │
-│  │   Left Column        │   │   Right Column            │  │
-│  │                      │   │                           │  │
-│  │  Article Metadata    │   │  Live Preview             │  │
-│  │  Reference Library   │   │  (sticky, scrollable)     │  │
-│  │  ├─ References tab   │   │                           │  │
-│  │  └─ PubMed Search tab│   │                           │  │
-│  │  Section Accordion   │   │                           │  │
-│  │  Paper Flow Checker  │   │                           │  │
-│  └──────────┬───────────┘   └───────────────────────────┘  │
-│             │ fetch() POST                                   │
-└─────────────┼───────────────────────────────────────────────┘
-              │
-┌─────────────▼───────────────────────────────────────────────┐
-│                     server.js (Express)                     │
-│                                                             │
-│   /api/generate          /api/improve                       │
-│   /api/keypoints         /api/refine          ──► Groq API  │
-│   /api/generate-table    /api/coherence-check               │
-│                                                             │
-│   /api/pubmed-search     /api/fetch-pmids     ──► NCBI API  │
-│                                                             │
-│   /api/export-docx                            ──► docx pkg  │
-│                                                             │
-│   GET /*                                      ──► index.html│
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                            Browser                               │
+│                                                                  │
+│  login.html          dashboard.html          index.html          │
+│  (unauthenticated)   (article list)          (editor + preview)  │
+│       │                    │                       │             │
+│       └────────────────────┴───────────────────────┘            │
+│                            │ fetch() / form POST                 │
+└────────────────────────────┼─────────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────────┐
+│                       server.js (Express)                        │
+│                                                                  │
+│  Auth Middleware (Passport.js)                                   │
+│  Session Middleware (express-session + connect-mongo)            │
+│  Static Middleware (serves HTML files + assets)                  │
+│                                                                  │
+│  /auth/google         /auth/google/callback  ──► Google OAuth    │
+│  /auth/register       /auth/login                                │
+│  /auth/logout         /auth/me                                   │
+│                                                                  │
+│  /api/articles (CRUD)          ──► MongoDB Atlas (Article model) │
+│                                                                  │
+│  /api/generate        /api/improve                               │
+│  /api/keypoints       /api/refine        ──► Groq API            │
+│  /api/generate-table  /api/coherence-check                       │
+│  /api/suggest-sections                                           │
+│                                                                  │
+│  /api/pubmed-search   /api/fetch-pmids   ──► NCBI E-utilities    │
+│                                                                  │
+│  /api/export-docx                        ──► docx npm package    │
+│  /api/version                                                    │
+│                                                                  │
+│  GET /*                                  ──► index.html (guarded)│
+└──────────────────────────────────────────────────────────────────┘
+                             │
+              ┌──────────────▼──────────────┐
+              │       MongoDB Atlas          │
+              │  users collection            │
+              │  articles collection         │
+              │  sessions collection         │
+              └─────────────────────────────┘
 ```
 
 ---
 
-## 3. Frontend Architecture (`index.html`)
+## 3. Authentication & Session Management
 
-### 3.1 Layout
+### 3.1 Strategies (Passport.js)
 
-Two-column CSS Grid (`grid-template-columns: 1fr 1fr`), responsive to single column below 960px.
+**Google OAuth 2.0 (`passport-google-oauth20`)**
+- `GET /auth/google` → redirect to Google consent screen
+- `GET /auth/google/callback` → exchange code for profile → upsert User by `googleId`
+- Requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 
-- **Left column** — scrollable. Contains all editing UI.
-- **Right column** — `position: sticky`, fills viewport height. Contains the live preview.
+**Local Strategy (`passport-local`)**
+- `POST /auth/register` → create User with bcrypt-hashed password (rounds: 12 prod, 1 test)
+- `POST /auth/login` → find by email, bcrypt compare
 
-### 3.2 State Model
+Both strategies serialize by `user._id`. `deserializeUser` loads the User from MongoDB on every authenticated request.
 
-All mutable application state lives in a single plain object:
+### 3.2 Session
+
+- `express-session` with `connect-mongo` — sessions stored in MongoDB `sessions` collection
+- `SESSION_SECRET` from env (32-byte random hex in production)
+- Sessions expire after 7 days of inactivity
+
+### 3.3 Route Protection
+
+`requireAuth` middleware redirects to `/login` if `req.isAuthenticated()` is false. Applied to all `/api/*` routes and `GET /`.
+
+```
+Public:    /auth/*, /login, /api/version
+Protected: /api/articles/*, /api/generate*, /api/pubmed*, /api/export*, GET /
+```
+
+---
+
+## 4. Data Models (Mongoose)
+
+### User
+
+```js
+{
+  _id: ObjectId,
+  googleId: String,               // null for local accounts
+  email: String (unique, required),
+  passwordHash: String,           // null for Google accounts
+  displayName: String,
+  avatarUrl: String,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### Article
+
+```js
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: 'User', indexed),
+  title: String (default: 'Untitled Article'),
+  topic: String,
+  authors: String,
+  keywords: String,
+  sections: Mixed,                // { [sectionId]: { prose: String, tables: [] } }
+  library: Array,                 // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, selected }]
+  customSections: Array,          // [{ id, title, position }]
+  wordCount: Number,
+  isLocked: Boolean (default: false),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### Sessions (managed by connect-mongo)
+
+```js
+{ _id: String, session: Mixed, expires: Date }
+```
+
+---
+
+## 5. Frontend Architecture
+
+Three HTML files, each self-contained with inline CSS and JavaScript (pre-Sprint 3).
+
+### `login.html`
+- Google Sign-in button → `GET /auth/google`
+- Email/password form → `POST /auth/login` and `POST /auth/register`
+- Error message display from `?error=` query param
+
+### `dashboard.html`
+
+Fetches `GET /api/articles` on load and renders article cards. Actions:
+- `+` button → `POST /api/articles` → redirect to `/?id=<newId>`
+- Card click → `GET /?id=<articleId>`
+- Delete icon → `DELETE /api/articles/:id` + confirmation → re-render
+
+### `index.html` (Editor)
+
+**State model:**
 
 ```js
 const state = {
+  articleId: String,              // from URL ?id= param
   sections: {
-    [sectionId]: { prose: string, tables: [] }
+    [sectionId]: { prose: String, tables: [] }
   },
   library: [
     { pmid, title, authors, year, journal, abstract,
@@ -79,216 +198,176 @@ const state = {
 }
 ```
 
-`SECTIONS` is a separate array of section definitions (id, num, title, placeholder, isCustom). It is mutated when custom sections are added or deleted.
+**Persistence (post-Sprint 1):**
+- On load: `GET /api/articles/:id` → populate state
+- Auto-save: `PUT /api/articles/:id` with debounced 1500ms
+- `localStorage` retained as write-behind fallback only
 
-There is no reactive framework. Every change calls one or more of:
-- `updateSection(id, value)` — updates `state.sections[id].prose`
-- `renderLibrary()` — re-renders the reference list DOM
-- `renderSections()` — re-renders the full section accordion
-- `updatePreview()` — re-renders `#article-preview`
+**Layout:** Two-column CSS Grid (`1fr 1fr`), responsive below 960px. Left column: editing UI. Right column: sticky live preview.
 
-### 3.3 Persistence
+**AI Streaming:** All AI actions call `streamToAiBox(url, body, sectionId, label, canApply)` which POSTs to an endpoint, reads the `ReadableStream` via `TextDecoder`, and appends chunks to the AI suggestion box.
 
-Auto-save writes the full state to `localStorage` key `mm-article` with a 1500ms debounce after any change:
+**Citation Linking:** `enhanceCitations(text, library)` converts `[Author et al., YYYY]` patterns to superscript links in the preview pane.
 
-```js
-localStorage.setItem("mm-article", JSON.stringify({
-  topic, title, authors, keywords,
-  sections: state.sections,
-  library: state.library,
-  customSections: SECTIONS.filter(s => s.isCustom)
-}))
-```
-
-On page load, `loadFromStorage()` restores all fields, re-injects custom sections into `SECTIONS`, and re-renders.
-
-### 3.4 AI Streaming
-
-All AI actions go through a single function `streamToAiBox(url, body, sectionId, label, canApply)`:
-
-1. POST to the given endpoint with `body` as JSON
-2. Read the response as a `ReadableStream` via `getReader()` / `TextDecoder`
-3. Append each decoded chunk to `contentEl.textContent`
-4. On completion, make the content editable if `canApply` is true
-
-Each AI action constructs its `body` before calling `streamToAiBox`:
-
-```
-generateDraft   → { topic, sectionId, sectionTitle, notes, pubmedContext }
-improveSection  → { topic, sectionTitle, content, pubmedContext }
-getKeyPoints    → { topic, sectionId, sectionTitle, pubmedContext }
-expandToProse   → { topic, sectionTitle, currentDraft, instruction (fixed), pubmedContext }
-refineSection   → { topic, sectionTitle, currentDraft, instruction (user input), pubmedContext }
-```
-
-`pubmedContext` is assembled by `getSelectedPubmedContext()`: all `state.library` entries with `selected === true`, each contributing `fullText` (OA papers, up to 3000 chars) or `abstract`.
-
-### 3.5 Citation Linking
-
-`enhanceCitations(text, library)` runs inside `updatePreview()` on every section's prose. It replaces `[Author et al., YYYY]` patterns with:
-- A superscript `<sup class="cite-link">` linked to the matching library entry (fuzzy match on surname + year)
-- Or a highlighted `<span class="cite-unmatched">` if no match is found
-
-### 3.6 Reference Library Tabs
-
-The Reference Library panel has two tabs sharing one collapsible body:
-
-```
-#reflib-body
-├── .reflib-tabs (tab bar)
-├── #reflib-tab-references (default visible)
-│   ├── PMID textarea + Fetch button
-│   ├── Select All / Deselect All / Sync References
-│   └── #reflib-list (rendered by renderLibrary())
-└── #reflib-tab-pubmed (hidden by default)
-    ├── #pubmed-query input + Search button
-    └── #pubmed-results (rendered by renderPubmedResults())
-```
-
-`toggleRefLib()` shows/hides `#reflib-body`. `switchRefTab(e, tab)` toggles visibility between the two tab content divs and moves the `.active` class on the tab buttons.
+**Reference Library:** Collapsible panel with two tabs — References (PMID import) and PubMed Search.
 
 ---
 
-## 4. Backend Architecture (`server.js`)
+## 6. Backend: Route and Endpoint Summary
 
-### 4.1 AI Endpoints
+### Auth Routes
 
-All six AI endpoints follow the same pattern:
+| Method | Path | Description |
+|---|---|---|
+| GET | /auth/google | Redirect to Google OAuth |
+| GET | /auth/google/callback | Handle OAuth callback, upsert user, set session |
+| POST | /auth/register | Create local account |
+| POST | /auth/login | Verify local credentials, set session |
+| POST | /auth/logout | Destroy session |
+| GET | /auth/me | Return current user |
 
-1. Validate required fields from `req.body`
-2. Build a prompt string (injecting topic, section context, user content, and `pubmedContext` where applicable)
-3. Call `client.chat.completions.create({ stream: true, ... })` via the `openai` npm package pointed at Groq
-4. Set `Content-Type: text/plain` + `Transfer-Encoding: chunked`
-5. Stream each chunk with `res.write(text)` → `res.end()`
+### Article Routes
 
-```
-Endpoint               Max Tokens   Uses pubmedContext
-/api/generate          1800         ✅
-/api/improve           1800         ✅
-/api/keypoints          900         ✅
-/api/refine            1800         ✅
-/api/generate-table    1200         ✅
-/api/coherence-check   1500         ✗ (uses full article sections instead)
-```
+| Method | Path | Description |
+|---|---|---|
+| GET | /api/articles | List all articles for signed-in user |
+| POST | /api/articles | Create blank article |
+| GET | /api/articles/:id | Full article (403 if not owner) |
+| PUT | /api/articles/:id | Full overwrite — auto-save (403 if not owner; 400 if locked) |
+| DELETE | /api/articles/:id | Permanent delete (403 if not owner) |
 
-**`getSectionContext(topic, sectionId, sectionTitle)`** maps each of the 13 section IDs to a topic-aware natural language description used in prompts (e.g. the `references` section gets a prompt requesting Vancouver format with 30–40 entries).
+### AI Endpoints (all POST, stream `text/plain`)
 
-### 4.2 PubMed Endpoints
+| Endpoint | Max Tokens | Uses pubmedContext |
+|---|---|---|
+| /api/generate | 1800 | Yes |
+| /api/improve | 1800 | Yes |
+| /api/keypoints | 900 | Yes |
+| /api/refine | 1800 | Yes |
+| /api/generate-table | 1200 | Yes |
+| /api/coherence-check | 1500 | No (uses full article sections) |
+| /api/suggest-sections | — | No (returns JSON, not streamed) |
 
-**`/api/pubmed-search`**
-1. `esearch.fcgi` → get PMID list (max 10, sorted by relevance)
-2. `efetch.fcgi` → fetch full records as XML
-3. `parsePubMedXML(xml)` → extract title, authors, year, journal, abstract, PMID from each `<PubmedArticle>` block using regex
-4. Return `{ articles, total }`
+All AI calls use `openai` npm package pointed at `https://api.groq.com/openai/v1` with `llama-3.3-70b-versatile`.
 
-**`/api/fetch-pmids`**
-1. Validate and deduplicate PMIDs (max 50)
-2. `efetch.fcgi` → batch fetch metadata XML → `parsePubMedXML()`
-3. For each article, `enrichArticle()` runs in parallel batches of 3 (NCBI rate limit):
-   - `elink.fcgi` → check if PMC ID exists
-   - If yes: `oa.fcgi` → check if Open Access
-   - If OA: BioC API → fetch structured full-text, extract INTRO/RESULTS/DISCUSS/CONCL/ABSTRACT passages, concatenate to 6000 chars
-4. Return `{ found: enrichedArticles, notFound: [] }`
+`getSectionContext(topic, sectionId, sectionTitle)` maps 13 section IDs to topic-aware prompt descriptions.
+
+### PubMed Endpoints (POST, JSON)
+
+| Endpoint | Description |
+|---|---|
+| /api/pubmed-search | esearch + efetch XML → parsed articles (max 10) |
+| /api/fetch-pmids | Batch fetch + OA enrichment via PMC BioC API (concurrency 3) |
 
 `fetchWithRetry(url, maxRetries=2)` wraps all NCBI calls with 1s retry delay on network error.
 
-### 4.3 Export Endpoint
+### Export and Utility
 
-**`/api/export-docx`** uses the `docx` npm package:
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | /api/export-docx | Server-side Word document via `docx` package |
+| GET | /api/version | Returns `{ version, sha, env }` for footer badge |
 
-1. Build `children[]` array of `Paragraph` and `Table` objects
-2. Title → bold, centered, size 36; Authors → italic, centered; Keywords → inline bold label
-3. Each section: `HeadingLevel.HEADING_1` paragraph + body paragraphs (split on `\n\n`)
-4. Tables: parsed from HTML via `parseTableHTML()` (regex extracts `<th>` headers and `<td>` rows), rendered as native `docx.Table` with 100% width
-5. `Packer.toBuffer(doc)` → send as `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+### Middleware Stack (in registration order)
+
+```
+morgan (HTTP logging)
+express.json() + express.urlencoded()
+express-session (connect-mongo store)
+passport.initialize() + passport.session()
+express.static('assets')
+app routes
+requireAuth guard (per-route)
+global error handler (last)
+```
 
 ---
 
-## 5. Data Flows
+## 7. Data Flows
+
+### Sign In (Google OAuth)
+
+```
+User clicks "Sign in with Google"
+  → GET /auth/google
+  → Google consent screen
+  → GET /auth/google/callback?code=...
+  → Passport exchanged code → Google profile
+  → Upsert User (googleId + email + displayName + avatarUrl)
+  → req.login() → session created in MongoDB
+  → Redirect to /dashboard
+```
+
+### Sign In (Email/Password)
+
+```
+User submits form
+  → POST /auth/login { email, password }
+  → Passport Local: find User by email, bcrypt.compare
+  → req.login() → session created
+  → Redirect to /dashboard
+```
+
+### Article Auto-Save
+
+```
+User types in any section textarea
+  → updateSection(id, value) → state.sections[id].prose = value
+  → scheduleAutoSave() — 1500ms debounced
+  → PUT /api/articles/:id { title, topic, authors, keywords, sections, library, customSections, wordCount }
+  → MongoDB: Article.findOneAndUpdate({ _id, userId })
+  → localStorage.setItem('mm-article', JSON.stringify(...)) — write-behind cache
+```
 
 ### AI Generation with Literature Grounding
 
 ```
 User clicks "Generate Draft"
-  │
-  ├─ getSelectedPubmedContext()
-  │    └─ state.library.filter(e => e.selected)
-  │         └─ each entry: fullText (OA) or abstract, sliced to 3000 chars
-  │
-  ├─ notes = document.getElementById(`notes-${id}`).value
-  │
-  └─ POST /api/generate
-       { topic, sectionId, sectionTitle, notes, pubmedContext }
-         │
-         └─ Groq (llama-3.3-70b-versatile)
-              └─ stream → streamToAiBox() → #ai-content-{id}
+  → getSelectedPubmedContext() → selected library entries → pubmedContext string
+  → POST /api/generate { topic, sectionId, sectionTitle, notes, pubmedContext }
+  → getSectionContext() → topic-aware prompt
+  → Groq llama-3.3-70b-versatile (stream: true)
+  → ReadableStream → TextDecoder → append to #ai-content-{id}
 ```
 
 ### Reference Import (PMID)
 
 ```
-User pastes PMIDs → fetchPmids()
-  │
-  └─ POST /api/fetch-pmids { pmids }
-       │
-       ├─ NCBI efetch (batch metadata)
-       ├─ NCBI elink × N (PMC ID lookup, concurrency=3)
-       ├─ NCBI oa.fcgi × N (OA check)
-       └─ BioC API × OA papers (full-text)
-            │
-            └─ { found: enrichedArticles, notFound }
-                 │
-                 ├─ state.library.push(...) for each new article
-                 ├─ renderLibrary()
-                 └─ scheduleAutoSave()
-```
-
-### Export to DOCX
-
-```
-User clicks "⬇ DOCX"
-  │
-  └─ POST /api/export-docx
-       { title, authors, keywords,
-         sections: [{ title, prose, tables: [{ html, caption }] }] }
-         │
-         └─ server builds docx.Document
-              └─ Packer.toBuffer() → ArrayBuffer → browser download
+User pastes PMIDs → POST /api/fetch-pmids { pmids }
+  → NCBI efetch (batch metadata XML) → parsePubMedXML()
+  → NCBI elink × N (PMC ID lookup, concurrency=3)
+  → NCBI oa.fcgi × N (OA check)
+  → BioC API × OA papers (full-text, up to 6000 chars)
+  → { found: enrichedArticles, notFound }
+  → state.library.push(...) → renderLibrary() → scheduleAutoSave()
 ```
 
 ---
 
-## 6. Key Design Decisions
+## 8. Key Design Decisions
 
 | Decision | Rationale |
 |---|---|
-| Single `index.html` file | No build step, no framework overhead. Simple to deploy and modify |
-| `openai` npm package → Groq | Groq's API is OpenAI-compatible; the same SDK works with `baseURL` swap. Free tier with fast inference |
-| Streaming all AI responses | Perceived performance — users see output immediately rather than waiting for full generation |
-| `localStorage` only | No auth, no backend complexity. Acceptable for single-user local tool |
-| Library as single source of truth for AI context | Eliminates the fragile in-memory `selectedPubmed` Set; selections persist across searches and page refreshes |
-| Server-side DOCX, client-side PDF | `docx` package requires Node; `html2pdf.js` is browser-only. PDF is WYSIWYG because it renders the actual preview DOM |
-| Concurrency limit of 3 for NCBI enrichment | NCBI anonymous rate limit is 3 req/s; with `NCBI_API_KEY` it is 10 req/s. Batching avoids 429 errors |
+| MongoDB + Mongoose | Fits JSON article state shape directly. Mixed type for `sections` allows flexible section additions without schema migrations |
+| express-session + connect-mongo | Sessions in the same MongoDB Atlas cluster — no Redis needed on Railway Hobby |
+| Passport.js with two strategies | Google OAuth for convenience; local email/password as fallback |
+| bcrypt rounds: 12 prod / 1 test | 12 rounds meets security minimum. Round 1 in tests cuts test suite time from ~30s to ~2s |
+| Full article overwrite on auto-save | Simplest correctness guarantee. Article document < 100KB — well within M0 Atlas limits |
+| localStorage as write-behind cache | No data loss if server temporarily unreachable. Server is always authoritative on reconnect |
+| `{ index: false }` on express.static | Prevents `index.html` being served without auth guard |
+| Groq via openai npm package | Groq's API is OpenAI-compatible; only `baseURL` swap required |
+| Server-side DOCX, client-side PDF (current) | `docx` requires Node. `html2pdf.js` is browser-only. Sprint 4 adds Puppeteer as server-side PDF primary |
+| localStorage retained as fallback | Removed as primary persistence in Sprint 1 but kept as emergency cache. Will be deprecated once server reliability is proven |
 
 ---
 
-## 7. Adding New Features
+## 9. Planned Architecture Changes
 
-### New AI Action (frontend only)
-1. Add a function that calls `streamToAiBox(url, body, id, label, canApply)`
-2. Add a `<button>` in the `renderSections()` template string
-3. No backend change needed if reusing `/api/refine` with a fixed instruction (e.g. `expandToProse`)
-
-### New AI Endpoint (requires backend)
-1. Add `app.post("/api/my-endpoint", ...)` in `server.js` following the streaming pattern
-2. Validate inputs, build prompt, stream from Groq
-3. Call from frontend with `streamToAiBox` or a custom `fetch` + stream reader
-
-### New Section Type
-1. Add an entry to the `SECTIONS` array in `index.html`
-2. Add a matching key to `getSectionContext()` map in `server.js`
-
-### New Library Metadata Field
-1. Add field to the object pushed in `fetchPmids()` → `insertReference()` → `parsePubMedXML()`
-2. Render it in `renderLibrary()`
-3. Include it in `getSelectedPubmedContext()` if it should feed AI context
+| Sprint | Change |
+|---|---|
+| Sprint 2 | `.env.development` / `.env` env separation. `semantic-release` automated versioning. GitHub Actions CI/CD |
+| Sprint 3 | Refactor `server.js` into `src/` modular structure. Extract frontend CSS + JS from `index.html` |
+| Sprint 4 | `puppeteer-core` server-side PDF. `express-rate-limit` on AI endpoints. `getSectionContext` service extraction |
+| Sprint 6 | `ArticleVersion` Mongoose model. `shareToken` + `collaborators` on Article. AES-256-GCM encrypted BYOK keys. `article.writingStyle` field |
+| Sprint 7 | `VectorStoreAdapter` + `EmbeddingAdapter` interfaces. LanceDB embedded vector store. File upload storage |
+| Sprint 8 | Mastra agent orchestration framework. Custom MCP servers. Socket.io + CRDT real-time collaboration |
