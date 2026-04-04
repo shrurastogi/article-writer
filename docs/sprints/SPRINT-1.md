@@ -74,6 +74,22 @@ NODE_ENV=development
 | PUT | /api/articles/:id | ✓ | Full overwrite |
 | DELETE | /api/articles/:id | ✓ | Delete article |
 
+## New Test Requirements
+
+Write these retroactively as PR `test/sprint1-coverage` at the start of Sprint 2.
+
+| File | Type | Covers |
+|---|---|---|
+| `tests/unit/utils/parsePubMedXML.test.js` | Unit | XML parsing: empty set, missing abstract, OA paper, duplicate PMIDs |
+| `tests/unit/middleware/requireAuth.test.js` | Unit | Allows authenticated requests; redirects unauthenticated to `/login` |
+| `tests/integration/auth.test.js` | Integration | Register (happy + `EMAIL_TAKEN`), login (happy + `INVALID_CREDENTIALS`), logout, `/auth/me` |
+| `tests/integration/articles.test.js` | Integration | Full CRUD — create, read, update, delete; ownership (403); locked article (400) |
+| `tests/integration/pubmed.test.js` | Integration | PMID fetch with NCBI fixture XML, OA enrichment, search, over-limit (400) |
+| `tests/e2e/auth.spec.ts` | E2E | Email/password sign-in, sign-out, redirect-if-unauthenticated |
+| `tests/e2e/article-lifecycle.spec.ts` | E2E | Create article → fill metadata → auto-save → reopen from dashboard |
+
+See `docs/TESTING.md` for fixtures, tooling setup, and full edge case list.
+
 ## Verification Checklist
 
 - [ ] `npm install` — no errors

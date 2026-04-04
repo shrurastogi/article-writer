@@ -1,11 +1,165 @@
 # API Reference — Medical Article Writer
 
-All endpoints are on the same Express server (`server.js`). Base URL: `http://localhost:3000`.
+All endpoints are on the same Express server. Base URL: `http://localhost:3000`.
 
 **Conventions:**
 - All request/response bodies are `application/json` unless noted
 - AI endpoints return `text/plain` with `Transfer-Encoding: chunked` (streaming)
 - Errors return `{ "error": "Human-readable message", "code": "MACHINE_CODE" }` with appropriate HTTP status
+- All `/api/*` routes (except `/api/version`) require an active session — unauthenticated requests return `401`
+
+---
+
+## Auth Endpoints
+
+### GET /auth/google
+Redirect to Google OAuth consent screen.
+
+**Response:** `302` redirect to Google.
+
+---
+
+### GET /auth/google/callback
+Handle Google OAuth callback. Called by Google after user grants permission.
+
+**Response:** `302` to `/dashboard` on success; `/login?error=oauth_failed` on failure.
+
+---
+
+### POST /auth/register
+Create a new local account.
+
+**Request**
+```json
+{
+  "email": "string (required)",
+  "password": "string (required, min 8 chars)",
+  "displayName": "string (optional)"
+}
+```
+**Response:** `201` + redirect to `/dashboard`.  
+**Errors:** `400` missing fields; `409 EMAIL_TAKEN` duplicate email.
+
+---
+
+### POST /auth/login
+Sign in with email and password.
+
+**Request**
+```json
+{
+  "email": "string (required)",
+  "password": "string (required)"
+}
+```
+**Response:** `200` + redirect to `/dashboard`.  
+**Errors:** `401 INVALID_CREDENTIALS` — same message for wrong email or wrong password (no user enumeration).
+
+---
+
+### POST /auth/logout
+Destroy the current session and sign out.
+
+**Response:** `200` + redirect to `/login`. Idempotent.
+
+---
+
+### GET /auth/me
+Return the currently authenticated user.
+
+**Response**
+```json
+{
+  "id": "string",
+  "email": "string",
+  "displayName": "string",
+  "avatarUrl": "string | null"
+}
+```
+**Errors:** `401` if not authenticated.
+
+---
+
+## Article Endpoints
+
+### GET /api/articles
+List all articles for the authenticated user, sorted by `updatedAt` descending.
+
+**Response**
+```json
+[
+  {
+    "_id": "string",
+    "title": "string",
+    "topic": "string",
+    "wordCount": "number",
+    "createdAt": "ISO date string",
+    "updatedAt": "ISO date string"
+  }
+]
+```
+
+---
+
+### POST /api/articles
+Create a new blank article.
+
+**Request body:** empty `{}` or omitted.
+
+**Response:** `201` — full article object with empty sections and library.
+
+---
+
+### GET /api/articles/:id
+Fetch a full article by ID.
+
+**Response:** Full article object including all sections, library, and customSections.  
+**Errors:** `400 INVALID_ID`; `403 FORBIDDEN` (not owner); `404 NOT_FOUND`.
+
+---
+
+### PUT /api/articles/:id
+Full overwrite of an article (auto-save endpoint).
+
+**Request**
+```json
+{
+  "title": "string",
+  "topic": "string",
+  "authors": "string",
+  "keywords": "string",
+  "sections": { "[sectionId]": { "prose": "string", "tables": [] } },
+  "library": [],
+  "customSections": [],
+  "wordCount": "number"
+}
+```
+**Response:** `200` + updated article object.  
+**Errors:** `400 ARTICLE_LOCKED`; `403 FORBIDDEN`; `404 NOT_FOUND`.
+
+---
+
+### DELETE /api/articles/:id
+Permanently delete an article.
+
+**Response:** `204 No Content`.  
+**Errors:** `403 FORBIDDEN`; `404 NOT_FOUND`.
+
+---
+
+## Utility
+
+### GET /api/version
+Return the running server version. No auth required.
+
+**Response**
+```json
+{
+  "version": "string (semver, e.g. 1.0.0)",
+  "sha": "string (git short SHA, e.g. a3f2b1c)",
+  "env": "string (development | production)"
+}
+```
 
 ---
 

@@ -7,8 +7,8 @@
 | Field | Value |
 |---|---|
 | Product | Medical Article Writer |
-| Version | 1.1 |
-| Last Updated | 2026-03-31 |
+| Version | 2.0 |
+| Last Updated | 2026-04-04 |
 | Status | Living Document |
 
 **How to use this document:** Features marked ✅ are shipped. Features marked 📋 are planned. Add new requirements under the relevant module or in Section 9 (Roadmap). Each requirement has a short ID (e.g. `F2-3`) for cross-referencing.
@@ -19,7 +19,7 @@
 
 Medical Article Writer is a browser-based AI writing tool that helps clinicians, researchers, and medical writers compose structured, peer-reviewed review articles. It provides a structured section editor, AI draft generation grounded in real PubMed literature, reference management, and professional export to PDF and Word.
 
-The app runs as a lightweight Node/Express server with a single-file frontend. Users sign in with Google to access a personal dashboard where all their articles are saved server-side and accessible across devices.
+The app runs as a Node/Express server with a modular backend and a separated frontend (HTML, CSS, JS as distinct files). Users sign in with Google or email/password to access a personal dashboard where all their articles are saved server-side in MongoDB Atlas and accessible across devices. Multi-LLM provider support (Groq, OpenAI, OpenRouter; Claude and Gemini in a later sprint) and an agentic writing pipeline are planned.
 
 ---
 
@@ -57,6 +57,8 @@ Writing a first review article as part of training. Needs structural scaffolding
 | Export ready for journal submission | DOCX and PDF output require no manual reformatting |
 | Zero data loss | Auto-save ensures work is never lost on accidental close |
 | Article history | Users can access all previously created articles from any device after sign-in |
+| AI output strictly grounded in selected sources | Context grounding enforced; strict mode blocks generation entirely without selected sources |
+| Support multiple AI providers | Users can bring their own API key for Groq, OpenAI, OpenRouter (Sprint 6); Claude + Gemini (Sprint 8) |
 
 ---
 
@@ -73,8 +75,9 @@ Status legend: ✅ Completed · 📋 Planned · 🔄 In Progress
 | F1-1 | Medical Topic | Free-text field that seeds all AI prompts with domain context | ✅ |
 | F1-2 | Article Metadata | Title, Authors & Affiliations, Keywords fields | ✅ |
 | F1-3 | Live Metadata in Preview | Title, authors, keywords render immediately in the preview pane | ✅ |
-| F1-4 | Auto-save | All content saved to `localStorage` with 1500ms debounce. Restored on page load | ✅ |
-| F1-5 | Clear All | Wipes all sections, metadata, library, and localStorage with confirmation | ✅ |
+| F1-4 | Auto-save | All content auto-saved to server with 1500ms debounce. Restored on page load | ✅ |
+| F1-5 | Clear All | Wipes all sections, metadata, library, and server article state with confirmation | ✅ |
+| F1-6 | Content Language Selector | "Output Language" dropdown in article metadata (default: English). Injects language instruction into all AI prompts. AI synthesises from English PubMed sources in target language | 📋 Sprint 5 |
 
 ---
 
@@ -91,7 +94,9 @@ Status legend: ✅ Completed · 📋 Planned · 🔄 In Progress
 | F2-7 | Add Custom Section | Modal to add a custom-titled section at any position before References | ✅ |
 | F2-8 | Rename Custom Section | Inline rename for user-created sections | ✅ |
 | F2-9 | Delete Section | Remove any section (custom or pre-defined) | ✅ |
-| F2-10 | Custom Section Persistence | Custom sections saved to localStorage and restored on page load | ✅ |
+| F2-10 | Custom Section Persistence | Custom sections saved to server and restored on page load | ✅ |
+| F2-11 | AI Section Recommendations | In the "Add Section" modal, AI suggests relevant custom section names based on article topic and existing sections | 📋 Sprint 4 |
+| F2-12 | Section Drag-and-Drop Reorder | Drag handle on each section accordion to reorder sections. New order persisted to `state.sections` order | 📋 Sprint 5 |
 
 ---
 
@@ -110,6 +115,10 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | F3-7 | Editable AI Box | AI suggestion text is directly editable before applying | ✅ |
 | F3-8 | Section-aware Prompts | Each section has a distinct, topic-aware system prompt (e.g. references section requests Vancouver format, abstract requests structured IMRAD format) | ✅ |
 | F3-9 | Paper Flow Checker | AI reviews the full article across all filled sections and returns: overall verdict, section-by-section transition analysis (✅/⚠️/❌), specific issues found, and numbered recommendations | ✅ |
+| F3-10 | Refine from Flow Check | "Apply to Section" button on each Flow Check recommendation opens that section and pre-fills the refine instruction box | 📋 Sprint 4 |
+| F3-11 | User-supplied Context ("Add Your Data") | Collapsible "Add Your Data" textarea per section. User-pasted content (study data, notes, institutional data) is passed as additional context to all AI actions for that section | 📋 Sprint 5 |
+| F3-12 | Visual AI Confidence Indicator | Color-coded bar (green = 3+ sources / yellow = 1–2 sources / red = 0 sources) under each AI action button. Tooltip shows supporting PMIDs used for the last generation | 📋 Sprint 4 |
+| F3-13 | Context Grounding | Soft mode (default): warning shown when generating without selected refs. Strict mode (user-configurable): blocks AI generation entirely unless ≥1 library paper is selected | 📋 Sprint 4 |
 
 ---
 
@@ -148,9 +157,13 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 | ID | Feature | Description | Status |
 |---|---|---|---|
-| F6-1 | PDF Export | Client-side export via html2pdf.js. Renders `#article-preview` directly — WYSIWYG output on A4 | ✅ |
+| F6-1 | PDF Export (client-side fallback) | Client-side export via html2pdf.js. Renders `#article-preview` directly — WYSIWYG output on A4. Kept as fallback when server PDF unavailable | ✅ |
 | F6-2 | DOCX Export | Server-side export via `docx` package. Produces properly formatted Word document with title, authors, keywords, section headings, body paragraphs, and tables | ✅ |
 | F6-3 | Auto-named File | Exported files are named from the article title (sanitised, underscored, 60-char max) | ✅ |
+| F6-4 | DOCX Justified Text | Body paragraphs in DOCX export use justified alignment | 📋 Sprint 4 |
+| F6-5 | Export Controls Relocation | Export buttons (PDF + DOCX) moved to the preview pane top bar for better discoverability | 📋 Sprint 4 |
+| F6-6 | Server-side PDF via Puppeteer | `POST /api/export-pdf-server` endpoint using `puppeteer-core` + system Chromium. Primary PDF path. Produces pixel-perfect PDF with correct page breaks, headers (article title), footers (page numbers), and consistent font rendering | 📋 Sprint 4 |
+| F6-7 | LaTeX Export | Export article as `.tex` file for journal submission (Elsevier, Springer). Sections mapped to standard LaTeX article structure | 📋 Sprint 7 |
 
 ---
 
@@ -158,11 +171,43 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 ### UF-1: Start a New Article
 
+```mermaid
+flowchart TD
+    A([User visits app URL]) --> B{Authenticated?}
+    B -- No --> C[Redirect to /login]
+    C --> D[Sign in\nGoogle OAuth or email/password]
+    D --> E[Redirect to Dashboard]
+    B -- Yes --> E
+    E --> F[Click + New Article]
+    F --> G[POST /api/articles\nBlank article created in MongoDB]
+    G --> H[Editor opens\n?id=articleId]
+
+    H --> I[Enter Medical Topic\ne.g. Multiple Myeloma]
+    I --> J[Enter Title /\nAuthors & Affiliations /\nKeywords]
+
+    J --> K{User types\nin any field}
+    K --> L[updateSection / updateMetadata\nUpdates client state]
+    L --> M[Preview pane re-renders live\nright column]
+    L --> N[Auto-save debounce\n1500ms]
+    N --> O[PUT /api/articles/:id\nPersisted to MongoDB Atlas]
+    O --> P{Save\nsuccessful?}
+    P -- Yes --> Q[localStorage write-behind\ncache updated]
+    P -- No --> R[localStorage used as\nfallback cache\nRetry on reconnect]
+
+    K --> K
+
+    style A fill:#F36633,color:#fff
+    style E fill:#1A1F71,color:#fff
+    style O fill:#1A1F71,color:#fff
+    style Q fill:#2d6a4f,color:#fff
+    style R fill:#e76f51,color:#fff
+```
+
 1. Open app at `http://localhost:3000`
 2. Enter **Medical Topic** (e.g. "Multiple Myeloma") — this seeds all AI calls
 3. Enter Article Title, Authors & Affiliations, Keywords
 4. Preview pane on the right updates live
-5. Work is auto-saved to localStorage; resuming later restores all content
+5. Work is auto-saved to the server; resuming later restores all content
 
 ---
 
@@ -174,7 +219,7 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 4. Click **✨ Generate Draft**
 5. AI streams a draft into the suggestion box below the textarea
 6. Review and edit the suggestion directly in the box
-7. *(Optional)* Type a refinement instruction and click **↺ Refine** — e.g. "cut to 400 words", "add more on proteasome inhibitors"
+7. *(Optional)* Type a refinement instruction and click **↺ Refine**
 8. *(Optional)* Click **↩ Undo** to revert a refinement
 9. Click **Apply** — draft moves into the section textarea
 10. Content is auto-saved
@@ -264,18 +309,18 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 ### UF-10: Export the Article
 
 1. Review the article in the live preview pane (right column)
-2. For PDF: click **⬇ PDF** — browser renders `#article-preview` and downloads A4 PDF
+2. For PDF: click **⬇ PDF** — server renders article via Puppeteer and downloads A4 PDF (falls back to html2pdf.js if server unavailable)
 3. For Word: click **⬇ DOCX** — server builds a `.docx` file with all sections and tables, browser downloads it
 4. File is named from the article title automatically
 
 ---
 
-### UF-11: Sign In with Google
+### UF-11: Sign In
 
 1. User visits the app URL
 2. If not authenticated, redirected to login page
-3. Click **Sign in with Google**
-4. Google OAuth consent screen — user grants permission
+3. Click **Sign in with Google** (or use email/password)
+4. Google OAuth consent screen — user grants permission (or credentials validated for email/password)
 5. Redirected back to the app, session established
 6. Lands on the article dashboard (UF-12)
 
@@ -307,24 +352,91 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | Constraint | Detail |
 |---|---|
 | Runtime | Node.js v18+ |
-| AI Provider | Groq API (`llama-3.3-70b-versatile`). Requires `GROQ_API_KEY` in `.env` |
-| PubMed | NCBI E-utilities (free). Optional `NCBI_API_KEY` raises rate limit from 3 to 10 req/s |
-| Storage | Currently `localStorage` only. Planned: server-side DB per user account (see F11-3). TBD: MongoDB vs PostgreSQL vs SQLite |
-| Auth | Planned: Google OAuth 2.0 via Passport.js or similar. Requires `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `.env` |
+| AI Provider | Groq (default, `llama-3.3-70b-versatile`). Multi-provider: OpenAI + OpenRouter (Sprint 6); Claude + Gemini (Sprint 8) |
+| PubMed | NCBI E-utilities (free). User-supplied NCBI key via Settings (F13-3) raises rate limit from 3 to 10 req/s |
+| Storage | MongoDB Atlas — two projects: `article-writer-dev` (M0 free) + `article-writer-prod` (M0 free, upgrade to M10 when needed) |
+| Auth | Google OAuth 2.0 via Passport.js ✅ (Sprint 1). Local email/password ✅ (Sprint 1) |
+| Hosting | Railway Hobby plan. Two projects: `article-writer-dev` (auto-deploy from `dev` branch) + `article-writer-prod` (auto-deploy from `main`). 512MB RAM per project |
+| Versioning | Fully automated via `semantic-release` + conventional commits. `feat:` → MINOR, `fix:` → PATCH, `feat!:` → MAJOR. Git short SHA suffix per deploy. App footer shows `v1.0.0-dev · sha` (dev) / `v1.0.0 · sha` (prod) |
 | Streaming | All AI endpoints use chunked transfer encoding (`text/plain`) |
-| PDF | Client-side only via `html2pdf.js` CDN. No server involvement |
+| PDF | `puppeteer-core` + system Chromium (server-side primary, Sprint 4). `html2pdf.js` client-side fallback |
 | DOCX | Server-side via `docx` npm package |
+| Vector store | LanceDB (embedded, default, Sprint 7); Qdrant/Weaviate via switchable `VectorStoreAdapter` (Sprint 7) |
+| Embeddings | HuggingFace `BAAI/bge-small-en` (default, free, Sprint 7); OpenAI / Cohere / VoyageAI via switchable `EmbeddingAdapter` (Sprint 7) |
+| Agent framework | Mastra (Sprint 8) |
+| MCP | Custom MCP servers: PubMed, Dimensions, quality-check, article-writer, Tavily web search, ClinicalTrials.gov (Sprint 8) |
 | Section content | Each section stores `{ prose: string, tables: [] }`. Max ~2000 chars per section sent to coherence check |
 
 ---
 
 ## 8. Known Limitations
 
-- `localStorage` cap (~5MB) limits total article size including library *(resolved by F11-3 server-side storage)*
-- No multi-user or collaboration support *(partially resolved by F10/F11 — each user has isolated articles)*
+- `localStorage` cap (~5MB) limits total article size including library *(resolved by F11-3 server-side storage ✅)*
+- No multi-user or collaboration support *(isolated user accounts shipped Sprint 1; sharing + real-time collab planned Sprint 6 + Sprint 8)*
 - OA full-text availability depends on PMC Open Access Subset; most articles provide abstract only
 - Citation matching (`[Author et al., Year]`) is fuzzy — relies on surname + year; disambiguation not supported
-- No version history beyond 5-step refinement undo within a session
+- No version history beyond 5-step refinement undo within a session *(F11-11 versioning planned Sprint 6)*
+- Railway Hobby tier (512MB RAM) limits concurrent heavy operations — Puppeteer PDF + active LLM stream may exhaust memory under load; `puppeteer-core` + system Chromium mitigates this vs bundled Chromium
+- RAG pipeline accuracy (Sprint 7) depends on embedding model quality and chunking strategy
+- Agent mode (Sprint 8) requires conventional commit discipline for semantic-release to work correctly
+
+---
+
+## 9. Infrastructure & Environments
+
+### Environment separation
+
+| Variable | Development | Production |
+|---|---|---|
+| `NODE_ENV` | `development` | `production` |
+| `MONGODB_URI` | Atlas `article-writer-dev` M0 | Atlas `article-writer-prod` M0/M10 |
+| `GOOGLE_CALLBACK_URL` | `http://localhost:3000/auth/google/callback` | Railway prod URL + `/auth/google/callback` |
+| `SESSION_SECRET` | Any local string | 32-byte random hex |
+| `LOG_LEVEL` | `debug` | `info` |
+| `PORT` | `3000` | Set by Railway |
+| `BUILD_SHA` | Set by CI (GitHub Actions) | Set by CI (GitHub Actions) |
+| `ENCRYPTION_KEY` | Any 32-char string | 32-byte random hex (for BYOK key encryption) |
+
+### File structure
+
+```
+.env                 # Production secrets (gitignored)
+.env.development     # Dev overrides — local Atlas dev, localhost callback (gitignored)
+.env.example         # Template documenting all variables (tracked in git)
+```
+
+### dotenv loading
+
+`server.js` loads the correct file based on `NODE_ENV`:
+```js
+const _envFile = process.env.NODE_ENV === 'production' ? '.env' : `.env.${process.env.NODE_ENV || 'development'}`;
+require('dotenv').config({ path: _envFile });
+```
+Production loads `.env`; development loads `.env.development`; test environment uses `mongodb-memory-server` (no `.env.test` needed).
+
+### CI/CD
+
+- **CI** (`ci.yml`): on every push → `npm run lint` + `npm test`
+- **Deploy dev** (`deploy-dev.yml`): on push to `dev` after CI passes → Railway dev deploy + inject `BUILD_SHA`
+- **Deploy prod** (`deploy-prod.yml`): on push to `main` after CI passes → `semantic-release` bumps version → Railway prod deploy + inject `BUILD_SHA`
+
+### Manual setup required (one-time, outside CI)
+
+1. MongoDB Atlas: two projects (`article-writer-dev`, `article-writer-prod`), each with an M0 free cluster, dedicated DB user, and appropriate network access rules
+2. Railway: two projects (`article-writer-dev` → `dev` branch, `article-writer-prod` → `main` branch), all env vars set in Variables tab
+3. Google OAuth: add Railway dev + prod callback URIs to Authorized Redirect URIs in Google Cloud Console
+4. GitHub branch protection: require PR + status checks on both `main` and `dev`
+
+---
+
+### Module F8 — Planned: Editor Improvements
+
+| ID | Feature | Description | Status |
+|---|---|---|---|
+| F8-1 | Rich text editor | Replace plain textarea with lightweight rich-text editor (bold, italic, lists) | 📋 |
+| F8-2 | Section reordering | Drag-and-drop to reorder sections *(see F2-12)* | 📋 Sprint 5 |
+| F8-3 | Word count targets | Per-section target word counts with progress indicator | 📋 |
+| F8-4 | Spell Check | Browser-native `spellcheck="true"` on all textareas | 📋 Sprint 5 |
 
 ---
 
@@ -332,10 +444,10 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 | ID | Feature | Description | Status |
 |---|---|---|---|
-| F10-1 | Google Sign-in | OAuth 2.0 login via Google. Users authenticate with their Google account — no separate password | 📋 |
-| F10-2 | Session management | Server-side session persists login state. Auto-redirect to login page if unauthenticated | 📋 |
-| F10-3 | Sign-out | Clear session and redirect to login page | 📋 |
-| F10-4 | User identity in header | Display signed-in user's name and avatar (from Google profile) in the app header | 📋 |
+| F10-1 | Google Sign-in | OAuth 2.0 login via Google. Users authenticate with their Google account — no separate password | ✅ |
+| F10-2 | Session management | Server-side session persists login state. Auto-redirect to login page if unauthenticated | ✅ |
+| F10-3 | Sign-out | Clear session and redirect to login page | ✅ |
+| F10-4 | User identity in header | Display signed-in user's name and avatar (from Google profile) in the app header | ✅ |
 
 ---
 
@@ -343,13 +455,20 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 | ID | Feature | Description | Status |
 |---|---|---|---|
-| F11-1 | Article dashboard | Landing page after login showing all articles belonging to the user. Displays article title, topic, last updated date, and word count | 📋 |
-| F11-2 | New article button | "+" button on the dashboard to create a new blank article and open it in the editor | 📋 |
-| F11-3 | Server-side article storage | Each article (sections, metadata, library, custom sections) stored server-side linked to the user's account. Replaces localStorage as the persistence layer | 📋 |
-| F11-4 | Auto-save to server | On every change, article state is persisted to the server (debounced, same 1500ms pattern). localStorage used as a fallback write-behind cache | 📋 |
-| F11-5 | Open existing article | Click any article on the dashboard to open it in the editor | 📋 |
-| F11-6 | Delete article | Delete an article from the dashboard with confirmation. Permanently removes all sections, library, and tables | 📋 |
-| F11-7 | Article last-updated timestamp | Each article card on the dashboard shows when it was last edited | 📋 |
+| F11-1 | Article dashboard | Landing page after login showing all articles belonging to the user. Displays article title, topic, last updated date, and word count | ✅ |
+| F11-2 | New article button | "+" button on the dashboard to create a new blank article and open it in the editor | ✅ |
+| F11-3 | Server-side article storage | Each article (sections, metadata, library, custom sections) stored server-side in MongoDB, linked to the user's account | ✅ |
+| F11-4 | Auto-save to server | On every change, article state is persisted to the server (debounced, 1500ms) | ✅ |
+| F11-5 | Open existing article | Click any article on the dashboard to open it in the editor | ✅ |
+| F11-6 | Delete article | Delete an article from the dashboard with confirmation. Permanently removes all sections, library, and tables | ✅ |
+| F11-7 | Article last-updated timestamp | Each article card on the dashboard shows when it was last edited | ✅ |
+| F11-8 | Dashboard List & Card Views | Toggle between card grid and compact list/table view. Both views show title, topic, word count, created date, and last modified date | 📋 Sprint 5 |
+| F11-9 | Dashboard Filtering | Text search + date range + word count filter. Active filters shown as removable chips. Clear Filters resets all | 📋 Sprint 5 |
+| F11-10 | View Mode + Article Locking | View (read-only) and Edit buttons on dashboard. Explicit Lock/Unlock action stored as `article.isLocked`. When locked: all textareas disabled, AI buttons hidden, auto-save skipped, padlock icon in editor header. Only article owner can lock/unlock | 📋 Sprint 6 |
+| F11-11 | Article Versioning | Auto-save snapshots every 5 minutes with change detection (hash of `state.sections`), capped at 50 per article. Manual "Save Version" button with user-supplied label. Version history panel with timestamps, labels, word counts, and Restore action. Restore saves current state as a new version first | 📋 Sprint 6 |
+| F11-12 | Article Sharing | Shareable read-only link (UUID `shareToken`). Owner grants editor access per-user (named collaborators with roles). Last-write-wins for concurrent edits. `GET /share/:token` requires no auth | 📋 Sprint 6 |
+| F11-12-RT | Real-time Collaboration | Socket.io + CRDT-based real-time concurrent editing. Requires architecture spike | 📋 Sprint 8 |
+| F11-13 | Clone Article | One-click duplicate from dashboard. Creates new article with same content, title prefixed "Copy of …", same owner, reset timestamps. Opens in editor | 📋 Sprint 5 |
 
 ---
 
@@ -357,18 +476,16 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 | ID | Feature | Description | Status |
 |---|---|---|---|
-| F12-1 | Unit tests for server endpoints | Jest test suite covering all `/api/*` endpoints with mocked Groq and NCBI calls. Validates request validation, error handling, and response shape | 📋 |
-| F12-2 | Unit tests for frontend utilities | Tests for `parsePubMedXML`, `enhanceCitations`, `getSelectedPubmedContext`, `wordCount`, and `htmlEsc` functions | 📋 |
-| F12-3 | Integration tests for PubMed pipeline | Tests for the full PMID fetch → enrich → parse flow with recorded NCBI fixture responses | 📋 |
-| F12-4 | E2E tests for critical user flows | Playwright tests covering: article creation, section generate/apply, add to library, PDF/DOCX export, Google login flow | 📋 |
-| F12-5 | CI pipeline — test gate | GitHub Actions workflow that runs the full test suite on every PR. PRs cannot be merged if tests fail | 📋 |
-| F12-6 | CI pipeline — lint gate | ESLint run on every PR to catch syntax errors and undefined references before merge | 📋 |
+| F12-1 | Unit tests for server endpoints | Jest test suite covering all `/api/*` endpoints with mocked Groq and NCBI calls. Validates request validation, error handling, and response shape | ✅ |
+| F12-2 | Unit tests for frontend utilities | Tests for `parsePubMedXML`, `enhanceCitations`, `getSelectedPubmedContext`, `wordCount`, and `htmlEsc` functions | ✅ |
+| F12-3 | Integration tests for PubMed pipeline | Tests for the full PMID fetch → enrich → parse flow with recorded NCBI fixture responses | ✅ |
+| F12-4 | E2E tests for critical user flows | Playwright tests covering: article creation, section generate/apply, add to library, PDF/DOCX export, Google login flow | ✅ |
+| F12-5 | CI pipeline — test gate | GitHub Actions workflow that runs the full test suite on every PR. PRs cannot be merged if tests fail | ✅ |
+| F12-6 | CI pipeline — lint gate | ESLint run on every PR to catch syntax errors and undefined references before merge | ✅ |
 
 ---
 
-## 9. Roadmap / Backlog
-
-*Add planned features here. Use the same table format as Section 5.*
+## 10. Roadmap / Backlog
 
 ### Module F7 — Planned: Citation & Reference Improvements
 
@@ -378,44 +495,139 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | F7-2 | Citation format selector | Export citations in Vancouver, APA, AMA, or custom format | 📋 |
 | F7-3 | Section-specific full-text | Store BioC sections (intro, results, discussion) separately to enable section-matched literature context | 📋 |
 
-### Module F8 — Planned: Editor Improvements
+---
 
-| ID | Feature | Description | Status |
+### Module F13 — Settings & Configuration
+
+| ID | Feature | Description | Sprint |
 |---|---|---|---|
-| F8-1 | Rich text editor | Replace plain textarea with lightweight rich-text editor (bold, italic, lists) | 📋 |
-| F8-2 | Section reordering | Drag-and-drop to reorder sections | 📋 |
-| F8-3 | Word count targets | Per-section target word counts with progress indicator | 📋 |
-
-### Module F9 — Planned: Collaboration & Persistence
-
-| ID | Feature | Description | Status |
-|---|---|---|---|
-| F9-1 | Export/import project | Save and load full article state as a JSON file | 📋 |
-| F9-2 | Multi-article management | Support multiple articles in localStorage with a project switcher | 📋 |
+| F13-1 | BYOK — LLM API Key | User enters provider API key (Groq / OpenAI / OpenRouter / Claude / Gemini). Encrypted with AES-256-GCM at rest (`ENCRYPTION_KEY` env var). Falls back to server env key if user has none | 📋 6 |
+| F13-2 | LLM Model Selector | Provider + model dropdown in Settings. Dynamic model list via `GET /api/llm/models`. Stored per-user in `user.llmConfig`. Sprint 6: Groq + OpenAI + OpenRouter. Sprint 8: Claude + Gemini | 📋 6/8 |
+| F13-3 | NCBI API Key | User supplies own NCBI key in Settings. Stored in `user.researchConfig`. Raises PubMed rate limit to 10 req/s | 📋 6 |
+| F13-4 | Default Config + Reset-to-Defaults | `DEFAULT_CONFIG` constant (Groq / llama-3.3-70b-versatile / HuggingFace embeddings / LanceDB / Light theme / English / Strict mode OFF). "Modified" badge on each changed setting. "Reset all to defaults" restores `DEFAULT_CONFIG` in one click | 📋 6 |
 
 ---
 
-## 10. Open Questions
+### Module F14 — Research Integrations
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F14-1 | Dimensions.ai Integration | Search Dimensions bibliometric database alongside PubMed. Requires Dimensions API key (free academic tier at dimensions.ai). Broader coverage for non-biomedical research | 📋 7 |
+| F14-2 | Semantic Scholar Integration | Search Semantic Scholar API (free, no key required). Citation graph + related-paper suggestions alongside PubMed results | 📋 7 |
+
+---
+
+### Module F15 — UI Preferences
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F15-1 | Dark Mode | GSK-compliant dark theme: dark backgrounds with GSK orange (#F36633) and navy (#1A1F71) as accent colors. `[data-theme="dark"]` CSS variable toggled by header button. Preference persists to `localStorage`. RULES.md updated to permit dark theme variant | 📋 5 |
+| F15-2 | Font Size Control | `--base-font-size` CSS variable. +/− controls in header. Resets to default. Persists to `localStorage` | 📋 5 |
+
+---
+
+### Module F16 — Document Intelligence & RAG
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F16-1 | Document Upload | Upload PDF/Word files server-side, stored per-user per-article. Initial storage: local filesystem; cloud blob storage later | 📋 7 |
+| F16-2 | PDF/Word Text Extraction | Extract text from uploaded files via `pdf-parse`. Text chunked for downstream embedding and AI context | 📋 7 |
+| F16-3 | Vector Embeddings | Chunk text → embed via switchable `EmbeddingAdapter`. Default: HuggingFace `BAAI/bge-small-en` (free). Options: OpenAI `text-embedding-3-small`, Cohere, VoyageAI (recommended for scientific text) | 📋 7 |
+| F16-4 | Vector Store | Store and query embeddings via switchable `VectorStoreAdapter`. Default: LanceDB (embedded, no extra server, Node.js-native). Options: Qdrant (self-hosted or free cloud), Weaviate | 📋 7 |
+| F16-5 | RAG Pipeline | Semantic search over uploaded docs + PubMed results. Top-K chunks injected into AI prompts as context. Grounding constraint (F3-13) applies equally to RAG-retrieved chunks | 📋 8 |
+
+---
+
+### Module F17 — Advanced Quality Checks
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F17-1 | Grammar & Style Check | New `POST /api/grammar-check` endpoint (Groq-powered). Checks passive voice, sentence length, academic register, hedging, formality. Section-by-section report panel | 📋 5 |
+| F17-2 | EQUATOR Checklist Validation | Auto-fill structured reporting checklists from article content: CONSORT (RCT), PRISMA (systematic review), STROBE (observational). Manual checklist items with checkboxes for items AI cannot auto-assess | 📋 7 |
+| F17-3 | Journal-specific Formatting Check | User selects target journal. AI checks article against journal style guide (word count limits, required sections, reference format, abstract structure) | 📋 7 |
+
+---
+
+### Module F18 — Agentic Writing Pipeline
+
+Both agentic modes coexist permanently alongside the existing manual incremental mode. Manual mode is never removed.
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F18-1 | One-Click Full Draft (Agentic MVP) | "Write Full Article" button. Sequentially calls existing AI endpoints for each section in order. Streamed progress panel shows current section. Human approve/skip checkpoint per section before proceeding to the next. Approved sections populated in editor; skipped sections unchanged | 📋 5 |
+| F18-2 | True Agent Orchestration | Mastra-based multi-agent pipeline: **Planner** → **Researcher** (searches PubMed/Dimensions via MCP tools) → **Generator** (writes each section) → **Validator** (coherence + grammar checks) → **Formatter** (export prep). Human feedback at each stage. Custom MCP servers: PubMed, Dimensions, quality-check, article-writer, Tavily web search, ClinicalTrials.gov, FDA OpenFDA | 📋 8 |
+
+---
+
+### Module F19 — Multilingual Support
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F19-1 | Content Language Selector | See F1-6. "Output Language" dropdown in article metadata. All AI prompts inject: *"Write in [language] at a clinical academic level."* PubMed search still returns English abstracts; AI synthesises in target language | 📋 5 |
+| F19-2 | UI Localization (i18n) | Extract all UI strings to locale files (`en.json`, `es.json`, etc.). Library: `i18next`. ~200–300 strings. GSK brand colors/logo unchanged; only text localizes | 📋 8 |
+
+---
+
+### Module F20 — UX Polish
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F20-1 | LaTeX Export | See F6-7. Export article as `.tex` file. Sections mapped to standard LaTeX article structure | 📋 7 |
+| F20-2 | Section Drag-and-Drop Reorder | See F2-12. Drag handle on each section accordion. New order persisted | 📋 5 |
+| F20-3 | Journal Target Selector | User picks target journal. AI adjusts style + word count limits. Submission checklist per journal | 📋 7 |
+| F20-4 | Keyboard Shortcuts | Ctrl+G (generate), Ctrl+Enter (apply), Ctrl+Z (undo), Ctrl+Shift+F (flow check) | 📋 5 |
+
+---
+
+### Module F21 — Writing Style Capture
+
+| ID | Feature | Description | Sprint |
+|---|---|---|---|
+| F21-1 | Style Calibration | Paste writing sample (300–500 words) per article. AI analyses and generates a structured `styleProfile`: avg sentence length, active/passive voice ratio, formality score, hedging frequency, citation density. Stored as `article.writingStyle` | 📋 6 |
+| F21-2 | Style Report Card | Visual card displaying style metrics after calibration. User can recalibrate with a new sample or clear the profile | 📋 6 |
+| F21-3 | Style Injection | All AI generation endpoints read `article.writingStyle.styleProfile` and append a style instruction to the system prompt: *"Write in the following academic style: [profile]"* | 📋 6 |
+
+---
+
+## 11. Open Questions
 
 | # | Question | Raised | Resolution |
 |---|---|---|---|
-| Q1 | Should the topic field lock the article to a specific disease (e.g. MM) or remain fully general? | 2026-03-31 | Remains general — topic field used to guide AI, not enforce structure |
+| Q1 | Should the topic field lock the article to a specific disease (e.g. MM) or remain fully general? | 2026-03-31 | Remains general — topic field used to guide AI, not enforce structure ✅ |
 | Q2 | Should "Add to Library" auto-open the References tab to confirm the addition? | 2026-03-31 | Open |
-| Q3 | Which database for server-side article storage? MongoDB (flexible JSON), PostgreSQL (relational, strong consistency), or SQLite (zero-infra, single-file)? | 2026-03-31 | Open |
-| Q4 | Should auto-save to server be a full-article overwrite or a diff/patch? Full overwrite is simpler; diff reduces bandwidth for large articles | 2026-03-31 | Open |
-| Q5 | Should the dashboard support article search/filter (by topic, date, word count)? | 2026-03-31 | Open |
-| Q6 | Which test framework for E2E? Playwright (recommended — better WSL support) vs Cypress | 2026-03-31 | Open |
-| Q7 | Should Google login be the only auth method, or also support email/password as fallback? | 2026-03-31 | Open |
+| Q3 | Which database for server-side article storage? | 2026-03-31 | MongoDB Atlas ✅ (Sprint 1 complete) |
+| Q4 | Should auto-save be a full-article overwrite or a diff/patch? | 2026-03-31 | Full overwrite (simpler; article sizes manageable in MongoDB) ✅ |
+| Q5 | Should the dashboard support article search/filter? | 2026-03-31 | Yes — F11-9 planned Sprint 5 ✅ |
+| Q6 | Which test framework for E2E? | 2026-03-31 | Playwright ✅ (already in package.json) |
+| Q7 | Should Google login be the only auth method, or also support email/password? | 2026-03-31 | Both — Google OAuth + local email/password shipped Sprint 1 ✅ |
+| Q8 | Versioning trigger: interval, on-save, or manual-only? | 2026-04-04 | Hybrid: 5-minute interval with change detection + manual "Save Version" button with label ✅ |
+| Q9 | RAG grounding for clinical trials data? | 2026-04-04 | ClinicalTrials.gov API + FDA OpenFDA (both free, no key) planned as MCP tools in Sprint 8 ✅ |
+| Q10 | Collaboration concurrency strategy? | 2026-04-04 | Sprint 6: last-write-wins. Sprint 8: Socket.io + CRDT real-time ✅ |
 
 ---
 
-## 11. Decisions Log
+## 12. Decisions Log
 
 | Date | Decision | Rationale |
 |---|---|---|
 | 2026-03-31 | Merged "Use in AI" + "Add to References" into single "Add to Library" button | Two parallel AI context flows (in-memory Set vs. persistent library) were fragile and confusing. Library is single source of truth |
 | 2026-03-31 | PubMed Search moved into Reference Library as a tab | Reduces panel count; reinforces that search → library is the intended flow |
 | 2026-03-31 | Key Points uses selected library papers as context | Makes Key Points actionable based on the author's actual evidence base, not just general knowledge |
-| 2026-03-31 | Google OAuth chosen over email/password for initial auth | Eliminates password management complexity; target users (clinicians, researchers) universally have Google accounts |
+| 2026-03-31 | Google OAuth chosen over email/password for initial auth | Eliminates password management complexity; target users universally have Google accounts |
 | 2026-03-31 | Server-side storage replaces localStorage as persistence layer | localStorage is device-bound and capped at ~5MB; server-side storage enables multi-device access and removes the size constraint |
 | 2026-03-31 | Test gate added to PR process (F12-5) | Prevents regressions as the codebase grows beyond two files; critical before adding auth and database layers |
+| 2026-04-04 | D1 — Dark mode: GSK-compliant dark theme | Dark backgrounds with GSK orange (#F36633) and navy (#1A1F71) as accents. RULES.md updated to permit dark theme as an exception to the GSK-only color rule |
+| 2026-04-04 | D2 — PDF export: Puppeteer primary + html2pdf.js fallback | Puppeteer (server-side) fixes page breaks, headers/footers, and font rendering. `puppeteer-core` + system Chromium chosen over bundled Chromium to stay within Railway 512MB RAM limit |
+| 2026-04-04 | D3 — Agentic pipeline: manual and agent modes coexist permanently | Manual incremental mode is never removed. F18-1 = one-click sequential draft (Sprint 5). F18-2 = true Mastra multi-agent pipeline (Sprint 8). User chooses mode per session |
+| 2026-04-04 | D4 — Collaboration: LWW now, real-time later | Sprint 6: last-write-wins (share link + named collaborators). Sprint 8: Socket.io + CRDT real-time collab |
+| 2026-04-04 | D5 — RAG scope: private uploaded docs + public sources | Users can upload own PDFs/Word files AND query PubMed/Dimensions. File storage: local filesystem initially, cloud blob storage in a later sprint |
+| 2026-04-04 | D6 — LLM providers: all 5, prioritised across sprints | Sprint 6: Groq + OpenAI + OpenRouter (all OpenAI-compatible format). Sprint 8: Claude + Gemini (separate SDK adapters). All accessible via Settings + BYOK |
+| 2026-04-04 | D7 — Dimensions API: to be confirmed | User to verify institutional access. Free academic tier available at dimensions.ai |
+| 2026-04-04 | D8 — Context grounding is a critical constraint | AI generation should only use selected sources. Soft mode (default): warning when no sources selected. Strict mode (user-configurable): blocks generation entirely without ≥1 selected source |
+| 2026-04-04 | D9 — Default config + one-click reset is mandatory | Every user-configurable setting has a `DEFAULT_CONFIG` constant. "Modified" badge per changed setting. "Reset all" restores defaults in one click |
+| 2026-04-04 | D10 — Versioning: hybrid auto + manual | 5-minute auto-snapshot with change detection. Manual "Save Version" with user label. Cap at 50 per article. Restore saves current state as new version first (no data loss) |
+| 2026-04-04 | D11 — Tavily web search for agents | Tavily (free tier 1000/mo, designed for AI agents, returns citations) as the web search MCP tool. Supplements PubMed + Dimensions with general web context for novel therapies and emerging data |
+| 2026-04-04 | D12 — No offline use | App requires server connection for auth, storage, and AI. No service worker or offline mode planned |
+| 2026-04-04 | D13 — Railway: one Hobby account, two projects | Dev project → `dev` branch (auto-deploy), prod project → `main` branch. Same codebase; different env vars. Semantic-release ensures dev shows `v1.0.0-dev.1 · sha` and prod shows `v1.0.0 · sha` |
+| 2026-04-04 | D14 — Switchable adapters for vector stores and embeddings | `VectorStoreAdapter` and `EmbeddingAdapter` interfaces enable switching without changing RAG pipeline code. VoyageAI recommended for scientific text quality |
+| 2026-04-04 | D15 — Writing style capture is per-article, not per-user | Style stored on `article.writingStyle` because each article may have a different target journal, co-authors, and voice requirements |
