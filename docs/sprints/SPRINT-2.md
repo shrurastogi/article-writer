@@ -1,7 +1,7 @@
 # Sprint 2 — Infrastructure & Environment Setup
 
-**Status:** In Progress  
-**Dates:** 2026-04-04 (started)  
+**Status:** Complete  
+**Dates:** 2026-04-04  
 **Priority tier:** Critical — do before any feature work  
 
 > **Note:** This sprint replaces the previous SPRINT-2 (Core UX Overhaul), which has been
@@ -148,10 +148,10 @@ These require browser/console access and cannot be done by Claude automatically.
 
 | PR | Branch | Status |
 |---|---|---|
-| [#24](https://github.com/shrurastogi/article-writer/pull/24) | `chore/git-branching` | Open — awaiting merge |
-| [#25](https://github.com/shrurastogi/article-writer/pull/25) | `chore/dev-prod-env` | Open — awaiting merge |
-| [#26](https://github.com/shrurastogi/article-writer/pull/26) | `chore/semantic-release` | Open — awaiting merge |
-| [#27](https://github.com/shrurastogi/article-writer/pull/27) | `chore/ci-cd` | Open — awaiting merge |
+| [#24](https://github.com/shrurastogi/article-writer/pull/24) | `chore/git-branching` | Merged |
+| [#25](https://github.com/shrurastogi/article-writer/pull/25) | `chore/dev-prod-env` | Merged |
+| [#26](https://github.com/shrurastogi/article-writer/pull/26) | `chore/semantic-release` | Merged |
+| [#27](https://github.com/shrurastogi/article-writer/pull/27) | `chore/ci-cd` | Merged |
 
 Merge order: #24 → #25 → #26 → #27. After #24 merges it creates the `dev` branch; remaining PRs should be retargeted to `dev`.
 
