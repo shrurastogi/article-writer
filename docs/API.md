@@ -145,6 +145,15 @@ Permanently delete an article.
 **Response:** `204 No Content`.  
 **Errors:** `403 FORBIDDEN`; `404 NOT_FOUND`.
 
+### POST /api/articles/:id/clone
+Deep-copy an article owned by the authenticated user. The clone gets `"Copy of …"` prepended to its title.
+
+**Response:** `201 Created`
+```json
+{ "article": { "_id": "...", "title": "Copy of My Article", ... } }
+```
+**Errors:** `403 FORBIDDEN`; `404 NOT_FOUND`.
+
 ---
 
 ## Utility

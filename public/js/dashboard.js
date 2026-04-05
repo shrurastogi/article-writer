@@ -3,6 +3,15 @@
     let pendingDeleteId = null;
     let currentView = localStorage.getItem("dashboard-view") || "card";
 
+    function showToast(msg, type = "info") {
+      const t = document.getElementById("toast");
+      if (!t) return;
+      t.textContent = msg;
+      t.className = `toast toast-${type} visible`;
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => t.classList.remove("visible"), 3000);
+    }
+
     // ── Bootstrap ──────────────────────────────────────────────────────────────
 
     async function init() {
@@ -145,6 +154,7 @@
             <td class="at-words">${words}</td>
             <td class="at-date">${dateStr}</td>
             <td class="at-actions" onclick="event.stopPropagation()">
+              <button class="clone-btn" title="Clone article" onclick="cloneArticle(event,'${a._id}')">⧉</button>
               <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event,'${a._id}',${JSON.stringify(a.title)})">✕</button>
             </td>`;
           tbody.appendChild(tr);
@@ -169,7 +179,10 @@
         const words = a.wordCount ? `${a.wordCount.toLocaleString()} words` : "No content";
 
         card.innerHTML = `
-          <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event, '${a._id}', ${JSON.stringify(a.title)})">✕</button>
+          <div class="card-actions">
+            <button class="clone-btn" title="Clone article" onclick="cloneArticle(event,'${a._id}')">⧉</button>
+            <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event, '${a._id}', ${JSON.stringify(a.title)})">✕</button>
+          </div>
           <div class="article-title">${escHtml(a.title || "Untitled Article")}</div>
           <div class="article-topic">${escHtml(a.topic || "")}</div>
           <div class="article-meta">
@@ -238,6 +251,20 @@
         btn.disabled = false;
         btn.textContent = "Delete";
         alert("Failed to delete article. Please try again.");
+      }
+    }
+
+    async function cloneArticle(e, id) {
+      e.stopPropagation();
+      try {
+        const res = await fetch(`/api/articles/${id}/clone`, { method: "POST" });
+        if (!res.ok) throw new Error("Clone failed");
+        const data = await res.json();
+        articles.unshift(data.article);
+        applyFilters();
+        showToast("Article cloned!", "success");
+      } catch {
+        showToast("Failed to clone article.", "error");
       }
     }
 
