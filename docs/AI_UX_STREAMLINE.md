@@ -321,25 +321,27 @@ No backend files touched. No database changes. No new endpoints.
 
 ## Timing Recommendation
 
+> **Updated:** Sprint 6 is already running. The original plan to slot this between Sprint 5 and Sprint 6 is no longer possible.
+
 ```
-Sprint 4 (running)
+Sprint 5 — complete ✓
       ↓
-Sprint 5 — Dashboard & Editor Enhancements  ← Grammar Check and "Add Your Data" added here
+Sprint 6 — Collaboration, Versioning & Full Settings  (running now)
+  PR 1: view-lock ✓  PR 2: versioning ✓  PR 3: sharing ✓
+  PR 4: settings · PR 5: writing style
       ↓
-► AI UX Streamline  ← insert here — reorganises Sprint 5's new Grammar + context controls
-      ↓
-Sprint 6 — Collaboration, Versioning & Full Settings
+► AI UX Streamline  ← run here, after Sprint 6 merges to dev
       ↓
 Sprint 7+ — RAG, Agents, Real-time collab
 ```
 
-**Run immediately after Sprint 5 for three reasons:**
+**Run after Sprint 6 completes. Do not run in parallel.**
 
-1. **Sprint 5 adds the features being reorganised.** Grammar Check (`PR 8`) and "Add Your Data" (`PR 5`) land in Sprint 5. Streamlining them immediately after (rather than in Sprint 5 itself) keeps Sprint 5 PRs focused and reviewable, and avoids redesigning mid-sprint.
+**Why not parallel:** Sprint 6 PR 1 (`feature/sprint6-view-lock`) modifies `renderSections()` to disable AI buttons when an article is locked — the same function that UX streamlining PR 1 needs to edit to replace the 3 buttons with 1. Branching from `dev` before Sprint 6 merges would produce conflicts in `renderSections()` that are non-trivial to resolve.
 
-2. **Sprint 6 builds settings and writing style on top of the editor.** Entering Sprint 6 with a clean, minimal AI actions row means any new Sprint 6 controls have less competition for visual space in the editor header.
+**Why not bundle into Sprint 6:** Sprint 6 is already in flight. Adding `renderSections()` changes mid-sprint risks destabilising PRs 2–5 which depend on a stable editor. Keep Sprint 6 scope clean.
 
-3. **It is small.** 5 PRs, no backend work, ~2–3 days. It slots naturally as a mini cleanup sprint between two larger feature sprints. Running it as a standalone sprint (not bundled into Sprint 5 or 6) keeps the scope of both those sprints clean and this change reviewable on its own merits.
+**Wait is acceptable:** Sprint 6 is 5 PRs with no remaining work in the section AI buttons area (PRs 3–5 touch settings, sharing, writing style — separate panels). Once Sprint 6 merges to `dev`, start this sprint immediately. The ~2–3 day effort is unchanged.
 
 **Estimated effort:** ~2–3 days  
 **Risk:** Low — no backend changes, no new endpoints, all changes are in `public/js/app.js` and `public/css/app.css`
