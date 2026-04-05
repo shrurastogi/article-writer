@@ -1,4 +1,5 @@
     let articles = [];
+    let filteredArticles = [];
     let pendingDeleteId = null;
     let currentView = localStorage.getItem("dashboard-view") || "card";
 
@@ -60,17 +61,63 @@
         if (!res.ok) throw new Error("Failed to load articles");
         const data = await res.json();
         articles = data.articles;
-        renderArticles();
+        applyFilters();
       } catch {
         document.getElementById("articles-container").innerHTML =
           '<p style="color:var(--danger);text-align:center;padding:40px 0">Failed to load articles. Please refresh.</p>';
       }
     }
 
-    function renderArticles() {
+    function applyFilters() {
+      const text = (document.getElementById("filter-text")?.value || "").toLowerCase().trim();
+      const dateFrom = document.getElementById("filter-date-from")?.value;
+      const dateTo = document.getElementById("filter-date-to")?.value;
+      const wordsMin = parseInt(document.getElementById("filter-words-min")?.value || "0") || 0;
+
+      filteredArticles = articles.filter(a => {
+        if (text && !`${a.title || ""} ${a.topic || ""}`.toLowerCase().includes(text)) return false;
+        if (dateFrom && new Date(a.updatedAt) < new Date(dateFrom)) return false;
+        if (dateTo && new Date(a.updatedAt) > new Date(dateTo + "T23:59:59")) return false;
+        if (wordsMin > 0 && (a.wordCount || 0) < wordsMin) return false;
+        return true;
+      });
+
+      const hasFilters = text || dateFrom || dateTo || wordsMin > 0;
+      document.getElementById("btn-clear-filters").style.display = hasFilters ? "inline-flex" : "none";
+      renderFilterChips({ text, dateFrom, dateTo, wordsMin });
+      renderArticles(filteredArticles);
+    }
+
+    function clearFilters() {
+      document.getElementById("filter-text").value = "";
+      document.getElementById("filter-date-from").value = "";
+      document.getElementById("filter-date-to").value = "";
+      document.getElementById("filter-words-min").value = "";
+      applyFilters();
+    }
+
+    function renderFilterChips({ text, dateFrom, dateTo, wordsMin }) {
+      const chips = document.getElementById("filter-chips");
+      const parts = [];
+      if (text) parts.push({ label: `"${text}"`, clear: () => { document.getElementById("filter-text").value = ""; applyFilters(); } });
+      if (dateFrom) parts.push({ label: `From ${dateFrom}`, clear: () => { document.getElementById("filter-date-from").value = ""; applyFilters(); } });
+      if (dateTo) parts.push({ label: `To ${dateTo}`, clear: () => { document.getElementById("filter-date-to").value = ""; applyFilters(); } });
+      if (wordsMin > 0) parts.push({ label: `≥${wordsMin} words`, clear: () => { document.getElementById("filter-words-min").value = ""; applyFilters(); } });
+      chips.innerHTML = "";
+      parts.forEach(({ label, clear }) => {
+        const chip = document.createElement("span");
+        chip.className = "filter-chip";
+        chip.innerHTML = `${escHtml(label)} <span class="filter-chip-x" title="Remove filter">✕</span>`;
+        chip.querySelector(".filter-chip-x").onclick = clear;
+        chips.appendChild(chip);
+      });
+    }
+
+    function renderArticles(list) {
+      const displayList = list !== undefined ? list : filteredArticles.length || articles.length === 0 ? filteredArticles : articles;
       const container = document.getElementById("articles-container");
 
-      if (!articles.length) {
+      if (!displayList.length) {
         container.innerHTML = `
           <div class="empty-state">
             <div class="empty-icon">📄</div>
@@ -87,7 +134,7 @@
           <th>Title</th><th>Topic</th><th>Words</th><th>Modified</th><th></th>
         </tr></thead>`;
         const tbody = document.createElement("tbody");
-        for (const a of articles) {
+        for (const a of displayList) {
           const dateStr = new Date(a.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
           const words = a.wordCount ? a.wordCount.toLocaleString() : "—";
           const tr = document.createElement("tr");
@@ -112,7 +159,7 @@
       const grid = document.createElement("div");
       grid.className = "articles-grid";
 
-      for (const a of articles) {
+      for (const a of displayList) {
         const card = document.createElement("div");
         card.className = "article-card";
         card.onclick = () => openArticle(a._id);
@@ -186,7 +233,7 @@
         if (!res.ok && res.status !== 204) throw new Error("Delete failed");
         articles = articles.filter(a => a._id !== pendingDeleteId);
         closeDeleteModal();
-        renderArticles();
+        applyFilters();
       } catch {
         btn.disabled = false;
         btn.textContent = "Delete";
