@@ -14,7 +14,21 @@
 
     // ── Bootstrap ──────────────────────────────────────────────────────────────
 
+    function applyTheme() {
+      const dark = localStorage.getItem("theme") === "dark";
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "");
+      const btn = document.getElementById("theme-toggle");
+      if (btn) btn.textContent = dark ? "☀️" : "🌙";
+    }
+
+    function toggleDarkMode() {
+      const dark = localStorage.getItem("theme") === "dark";
+      localStorage.setItem("theme", dark ? "light" : "dark");
+      applyTheme();
+    }
+
     async function init() {
+      applyTheme();
       const user = await checkAuth();
       if (!user) return;
       hydrateUserWidget(user);
