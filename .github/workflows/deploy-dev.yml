@@ -16,11 +16,11 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Set BUILD_SHA in Railway
-        run: railway variables --set "BUILD_SHA=${{ github.sha }}" --service article-writer-dev
+        run: railway variables --set "BUILD_SHA=${{ github.sha }}"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_DEV }}
 
       - name: Deploy to Railway dev
-        run: railway up --service article-writer-dev --detach
+        run: railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_DEV }}
