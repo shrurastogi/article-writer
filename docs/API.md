@@ -316,6 +316,29 @@ Check a section for grammar and style issues (passive voice, long sentences, inf
 
 ---
 
+### POST /api/agent/draft
+Generate full article drafts for all sections in one request (SSE stream).
+
+**Request**
+```json
+{
+  "topic": "string (required)",
+  "sections": [
+    { "id": "string", "title": "string", "notes": "string", "userContext": "string" }
+  ],
+  "language": "string (optional)",
+  "pubmedContext": "string (optional)"
+}
+```
+**Response:** `text/event-stream`. Events:
+- `{ type: "section_start", id, title }` — generation began for this section
+- `{ type: "section_done", id, title, content }` — section draft ready
+- `{ type: "complete" }` — all sections done
+- `{ type: "error", message }` — generation failed
+**Errors:** `400` missing topic or empty sections array.
+
+---
+
 ## PubMed Endpoints (JSON)
 
 ### POST /api/pubmed-search

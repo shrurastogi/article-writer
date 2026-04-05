@@ -151,6 +151,7 @@
       <span class="panel-title">Article Preview</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="total-wc" id="total-wc">0 words</span>
+        <button class="btn btn-ai btn-sm" id="full-draft-btn" onclick="startFullDraft()">✨ Write Full Article</button>
         <button class="btn btn-secondary btn-sm" onclick="clearAll()">Clear All</button>
         <button class="btn btn-secondary btn-sm" onclick="downloadDOCX()">⬇ DOCX</button>
         <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ PDF</button>
@@ -166,6 +167,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Full Draft Progress Modal -->
+<div class="modal-overlay" id="draft-progress-modal">
+  <div class="draft-progress-box">
+    <div class="draft-progress-title">✨ Writing Full Article</div>
+    <div class="draft-progress-subtitle" id="draft-progress-subtitle">Generating drafts for each section…</div>
+    <div class="draft-section-list" id="draft-section-list"></div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-secondary btn-sm" onclick="cancelFullDraft()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- Add Section Modal -->
 <div class="modal-overlay" id="add-section-modal">

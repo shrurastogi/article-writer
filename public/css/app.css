@@ -308,6 +308,15 @@
     /* ── Modals ── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; }
     .modal-overlay.open { display: flex; }
+    .draft-progress-box { background: var(--card); border-radius: 12px; padding: 24px 28px; width: 540px; max-width: 94vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .draft-progress-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .draft-progress-subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; }
+    .draft-section-list { display: flex; flex-direction: column; gap: 10px; }
+    .draft-section-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    .draft-section-row-title { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; }
+    .draft-section-status { font-size: 0.78rem; color: var(--muted); }
+    .draft-section-preview { font-size: 0.8rem; color: var(--muted); font-style: italic; margin: 4px 0 8px; }
+    .draft-section-actions { display: flex; gap: 6px; margin-top: 6px; }
     .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 460px; max-width: 92vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
     .modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
     .modal-actions { display: flex; gap: 8px; margin-top: 16px; }

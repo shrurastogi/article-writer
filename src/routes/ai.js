@@ -442,4 +442,74 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
   }
 });
 
+// One-click full article draft — SSE endpoint
+router.post("/agent/draft", async (req, res) => {
+  const { topic, sections, language, pubmedContext } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return res.status(400).json({ error: "No sections provided." });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  function sendEvent(data) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+
+  const subject = topic.trim();
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
+  const litText = pubmedContext?.trim()
+    ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
+    : "";
+
+  try {
+    for (const section of sections) {
+      const { id, title, notes, userContext } = section;
+      sendEvent({ type: "section_start", id, title });
+
+      const context = getSectionContext(subject, id, title);
+      const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
+      const userContextText = userContext?.trim()
+        ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+        : "";
+
+      const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
+
+Requirements:
+- Formal academic writing style suitable for a high-impact journal
+- Evidence-based with citations as [Author et al., Year] placeholders
+- Comprehensive yet concise (300–600 words for most sections)
+- Return ONLY the section content — no section heading, no preamble, no explanations${notesText}${litText}${userContextText}`;
+
+      const stream = await getClient().chat.completions.create({
+        model: MODEL,
+        max_tokens: 1800,
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+      });
+
+      let content = "";
+      for await (const chunk of stream) {
+        content += chunk.choices[0]?.delta?.content || "";
+      }
+
+      sendEvent({ type: "section_done", id, title, content });
+    }
+
+    sendEvent({ type: "complete" });
+    res.end();
+  } catch (err) {
+    logger.error({ msg: "Agent draft error", error: err.message });
+    sendEvent({ type: "error", message: err.message });
+    res.end();
+  }
+});
+
 module.exports = router;
