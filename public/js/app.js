@@ -159,7 +159,15 @@ function renderSections() {
           <button class="btn btn-outline btn-sm" onclick="expandToProse('${s.id}','${titleEsc}')">✍ Expand to Prose</button>
           <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${titleEsc}')">💡 Key Points</button>
           <button class="btn btn-outline btn-sm" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
+          <button class="btn btn-outline btn-sm" onclick="runGrammarCheck('${s.id}','${titleEsc}')">📝 Grammar</button>
           <div class="confidence-bar" id="conf-${s.id}"></div>
+        </div>
+        <div class="grammar-panel" id="grammar-${s.id}" style="display:none">
+          <div class="grammar-panel-header">
+            <span>📝 Grammar & Style</span>
+            <button class="btn btn-secondary btn-sm" onclick="closeGrammarPanel('${s.id}')">✕</button>
+          </div>
+          <div class="grammar-results" id="grammar-results-${s.id}"></div>
         </div>
         <div class="ai-box" id="ai-${s.id}">
           <div class="ai-box-header">
@@ -573,6 +581,73 @@ function closeAiBox(id) {
   const undoBtn = document.getElementById(`ai-undo-${id}`);
   if (undoBtn) undoBtn.style.display = "none";
   refinementHistory[id] = [];
+}
+
+// ── Grammar check ──
+
+function getLanguage() {
+  return document.getElementById("language-select")?.value || "English";
+}
+
+async function runGrammarCheck(id, title) {
+  const content = document.getElementById(`section-${id}`)?.value || "";
+  if (!content.trim()) {
+    showToast("Add some content before running grammar check.", "error");
+    return;
+  }
+  const panel = document.getElementById(`grammar-${id}`);
+  const results = document.getElementById(`grammar-results-${id}`);
+  panel.style.display = "block";
+  results.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);font-style:italic">Checking...</div>';
+
+  const topic = document.getElementById("medical-topic")?.value || "";
+  const language = getLanguage();
+
+  try {
+    const res = await fetch("/api/grammar-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, topic, sectionTitle: title, language }),
+    });
+    if (!res.ok) throw new Error("Request failed");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let raw = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      raw += decoder.decode(value, { stream: true });
+    }
+    renderGrammarResults(id, raw.trim());
+  } catch {
+    results.innerHTML = '<div style="color:var(--danger);font-size:0.82rem">Failed to check grammar. Please try again.</div>';
+  }
+}
+
+function renderGrammarResults(id, rawText) {
+  const results = document.getElementById(`grammar-results-${id}`);
+  if (!results) return;
+  if (rawText === "NO_ISSUES" || !rawText.includes("ISSUE |")) {
+    results.innerHTML = '<div class="grammar-no-issues">✅ No issues found</div>';
+    return;
+  }
+  const lines = rawText.split("\n").filter(l => l.startsWith("ISSUE |"));
+  const typeLabels = { PASSIVE_VOICE: "Passive Voice", LONG_SENTENCE: "Long Sentence", INFORMAL: "Informal", HEDGING: "Hedging" };
+  results.innerHTML = lines.map(line => {
+    const parts = line.split("|").map(p => p.trim());
+    const type = parts[1] || "";
+    const fragment = parts[2] || "";
+    const suggestion = parts[3] || "";
+    return `<div class="grammar-issue-card">
+      <span class="grammar-issue-type">${escHtml(typeLabels[type] || type)}</span>
+      <div class="grammar-fragment">"${escHtml(fragment)}"</div>
+      <div class="grammar-suggestion">${escHtml(suggestion)}</div>
+    </div>`;
+  }).join("");
+}
+
+function closeGrammarPanel(id) {
+  document.getElementById(`grammar-${id}`).style.display = "none";
 }
 
 // ── PDF export ──

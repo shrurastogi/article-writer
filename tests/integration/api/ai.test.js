@@ -187,3 +187,21 @@ describe("POST /api/generate-table", () => {
     expect(res.body.error).toBeDefined();
   });
 });
+
+describe("POST /api/grammar-check", () => {
+  it("streams grammar results for valid content", async () => {
+    const res = await request(app)
+      .post("/api/grammar-check")
+      .send({ content: "The drug was administered by the physician.", topic: "Oncology", sectionTitle: "Treatment" });
+    expect(res.status).toBe(200);
+    expect(res.text).toBeDefined();
+  });
+
+  it("returns 400 when content is missing", async () => {
+    const res = await request(app)
+      .post("/api/grammar-check")
+      .send({ topic: "Oncology" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+});
