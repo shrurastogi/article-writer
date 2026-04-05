@@ -7,7 +7,7 @@ const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -19,6 +19,9 @@ router.post("/generate", async (req, res) => {
   const litText = pubmedContext?.trim()
     ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
     : "";
+  const userContextText = userContext?.trim()
+    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+    : "";
 
   const prompt = `You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
@@ -27,7 +30,7 @@ Requirements:
 - Evidence-based with citations as [Author et al., Year] placeholders
 - Comprehensive yet concise (300–600 words for most sections)
 - Include key statistics, landmark trial names, drug names, and current guidelines where applicable
-- Return ONLY the section content — no section heading, no preamble, no explanations${notesText}${litText}`;
+- Return ONLY the section content — no section heading, no preamble, no explanations${notesText}${litText}${userContextText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -53,7 +56,7 @@ Requirements:
 
 // Improve existing section text
 router.post("/improve", async (req, res) => {
-  const { topic, sectionTitle, content, pubmedContext } = req.body;
+  const { topic, sectionTitle, content, pubmedContext, userContext } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -66,6 +69,9 @@ router.post("/improve", async (req, res) => {
   const litText = pubmedContext?.trim()
     ? `\n\nRecent literature from PubMed (use these for evidence and citations):\n${pubmedContext}`
     : "";
+  const userContextText = userContext?.trim()
+    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+    : "";
 
   const prompt = `You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
 
@@ -76,7 +82,7 @@ Make it:
 - More concise where appropriate without losing key content
 - Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)
 
-Return ONLY the improved text — no explanations, no heading.${litText}
+Return ONLY the improved text — no explanations, no heading.${litText}${userContextText}
 
 Original text:
 ${content}`;
@@ -105,7 +111,7 @@ ${content}`;
 
 // Suggest key points to cover in a section
 router.post("/keypoints", async (req, res) => {
-  const { topic, sectionId, sectionTitle, pubmedContext } = req.body;
+  const { topic, sectionId, sectionTitle, pubmedContext, userContext } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -115,6 +121,9 @@ router.post("/keypoints", async (req, res) => {
   const context = getSectionContext(subject, sectionId, sectionTitle);
   const litText = pubmedContext?.trim()
     ? `\n\nSelected references from the user's library (abstracts and available full-text). Extract specific key points, trial names, statistics, and findings directly from these papers:\n${pubmedContext}`
+    : "";
+  const userContextText = userContext?.trim()
+    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
     : "";
 
   const prompt = `You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.
@@ -127,7 +136,7 @@ Include:
 - Specific drug names, biomarkers, or criteria where relevant
 ${pubmedContext?.trim() ? "- Cite specific findings from the provided references where applicable (Author et al., Year)" : ""}
 
-Format as a clear bulleted list. Each point must be specific and actionable, not generic.${litText}`;
+Format as a clear bulleted list. Each point must be specific and actionable, not generic.${litText}${userContextText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -210,7 +219,7 @@ Example structure:
 
 // Refine an existing draft section with a user instruction
 router.post("/refine", async (req, res) => {
-  const { topic, sectionTitle, currentDraft, instruction, pubmedContext } = req.body;
+  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -225,6 +234,9 @@ router.post("/refine", async (req, res) => {
   const litText = pubmedContext?.trim()
     ? `\n\n${pubmedContext}`
     : "";
+  const userContextText = userContext?.trim()
+    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+    : "";
 
   const prompt = `You are an expert medical writer specializing in ${topic}.
 The user has a draft of the "${sectionTitle}" section and wants to refine it with the following instruction:
@@ -232,7 +244,7 @@ The user has a draft of the "${sectionTitle}" section and wants to refine it wit
 Instruction: ${instruction}
 
 Current draft:
-${currentDraft}${litText}
+${currentDraft}${litText}${userContextText}
 
 Apply the instruction precisely. Preserve content not targeted by the instruction.
 Return ONLY the refined section text — no heading, no preamble, no explanation.`;
