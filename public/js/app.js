@@ -33,8 +33,23 @@ let tableModalSectionId = null;
 let autoSaveTimer = null;
 const articleId = new URLSearchParams(window.location.search).get("id");
 
+// ── Dark mode ──
+function applyTheme() {
+  const dark = localStorage.getItem("theme") === "dark";
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "");
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = dark ? "☀️" : "🌙";
+}
+
+function toggleDarkMode() {
+  const dark = localStorage.getItem("theme") === "dark";
+  localStorage.setItem("theme", dark ? "light" : "dark");
+  applyTheme();
+}
+
 // ── Init ──
 (async () => {
+  applyTheme();
   await checkAuth();
   await loadArticle();
   renderSections();

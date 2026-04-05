@@ -21,6 +21,31 @@
       --gsk-navy: #1A1F71;
     }
 
+    [data-theme="dark"] {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --border: #2d3561;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --secondary: #94a3b8;
+      --ai-light: #1e2147;
+      --ai-border: #2d3561;
+      --pubmed-light: #0f1f35;
+      --pubmed-border: #1d4ed8;
+    }
+    [data-theme="dark"] header { background: #16213e; border-color: #2d3561; }
+    [data-theme="dark"] .panel { background: #16213e; border-color: #2d3561; }
+    [data-theme="dark"] .panel-header { background: #1e2a4a; border-color: #2d3561; }
+    [data-theme="dark"] textarea, [data-theme="dark"] input[type="text"], [data-theme="dark"] input[type="number"], [data-theme="dark"] select { background: #1a1a2e; color: var(--text); border-color: #2d3561; }
+    [data-theme="dark"] .modal-box { background: #16213e; color: var(--text); }
+    [data-theme="dark"] .ai-box { background: #1e2147; border-color: #2d3561; }
+    [data-theme="dark"] .ai-box-content { color: var(--text); }
+    [data-theme="dark"] #article-preview { background: #16213e; color: var(--text); }
+    [data-theme="dark"] .reflib-list { background: #1a1a2e; }
+    [data-theme="dark"] .reflib-item { background: #1e2147; border-color: #2d3561; }
+    [data-theme="dark"] .coherence-panel { background: #16213e; border-color: #2d3561; }
+    [data-theme="dark"] .user-ctx-input { background: #1a1a2e; color: var(--text); border-color: #2d3561; }
+
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     /* ── Header ── */
@@ -43,6 +68,8 @@
     .user-name { font-size: 0.82rem; color: var(--secondary); }
     .btn-dashboard { font-size: 0.82rem; color: var(--ai); text-decoration: none; padding: 4px 8px; border-radius: 5px; border: 1px solid var(--ai-border); }
     .btn-dashboard:hover { background: var(--ai-light); }
+    .btn-theme-toggle { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 1rem; cursor: pointer; line-height: 1; transition: background 0.15s; }
+    .btn-theme-toggle:hover { background: var(--bg); }
 
     /* ── Buttons ── */
     .btn {
