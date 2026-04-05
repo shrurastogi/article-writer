@@ -28,6 +28,7 @@
     </div>
     <button class="btn-theme-toggle" onclick="saveVersionManual()" title="Save version snapshot" style="font-size:0.8rem">📌 Save Version</button>
     <button class="btn-theme-toggle" onclick="openVersionHistory()" title="Version history" style="font-size:0.8rem">🕐 History</button>
+    <button class="btn-theme-toggle" onclick="openShareModal()" title="Share article" style="font-size:0.8rem">🔗 Share</button>
     <button id="theme-toggle" class="btn-theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
     <div class="user-widget" id="user-widget">
       <span id="user-avatar-wrap"></span>
@@ -223,6 +224,43 @@
 </div>
 
 <div id="version-history-panel" class="version-history-panel"></div>
+
+<!-- ── Share Modal ── -->
+<div class="modal-overlay" id="share-modal" style="display:none">
+  <div class="modal-box" style="width:520px">
+    <div class="modal-title">Share Article</div>
+
+    <div id="share-link-section">
+      <div id="share-link-display" style="display:none;margin-bottom:12px">
+        <label style="font-size:0.82rem;color:var(--secondary)">Share link:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input id="share-link-input" type="text" readonly style="flex:1;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:var(--bg)" />
+          <button class="btn btn-sm" onclick="copyShareLink()">Copy</button>
+          <button class="btn btn-sm btn-outline" onclick="revokeShareLink()">Revoke</button>
+        </div>
+      </div>
+      <div id="share-link-empty" style="margin-bottom:12px;font-size:0.85rem;color:var(--secondary)">No share link generated yet.</div>
+      <button class="btn btn-sm btn-ai" id="generate-share-btn" onclick="generateShareLink()">Generate Share Link</button>
+    </div>
+
+    <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)" />
+
+    <div style="font-weight:600;font-size:0.88rem;margin-bottom:10px">Invite Collaborator</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <input id="collab-email" type="email" placeholder="colleague@example.com" style="flex:1;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px" />
+      <select id="collab-role" style="font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px">
+        <option value="viewer">Viewer</option>
+        <option value="editor">Editor</option>
+      </select>
+      <button class="btn btn-sm" onclick="addCollaborator()">Invite</button>
+    </div>
+    <div id="collaborators-list" style="font-size:0.82rem;color:var(--secondary)"></div>
+
+    <div class="modal-actions" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeShareModal()">Close</button>
+    </div>
+  </div>
+</div>
 
 <script src="/js/app.js"></script>
 </body>
