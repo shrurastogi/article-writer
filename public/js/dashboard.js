@@ -1,5 +1,6 @@
     let articles = [];
     let pendingDeleteId = null;
+    let currentView = localStorage.getItem("dashboard-view") || "card";
 
     // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -7,7 +8,16 @@
       const user = await checkAuth();
       if (!user) return;
       hydrateUserWidget(user);
+      setView(currentView);
       await loadArticles();
+    }
+
+    function setView(mode) {
+      currentView = mode;
+      localStorage.setItem("dashboard-view", mode);
+      document.getElementById("view-btn-card").classList.toggle("active", mode === "card");
+      document.getElementById("view-btn-list").classList.toggle("active", mode === "list");
+      renderArticles();
     }
 
     async function checkAuth() {
@@ -70,6 +80,35 @@
         return;
       }
 
+      if (currentView === "list") {
+        const table = document.createElement("table");
+        table.className = "articles-table";
+        table.innerHTML = `<thead><tr>
+          <th>Title</th><th>Topic</th><th>Words</th><th>Modified</th><th></th>
+        </tr></thead>`;
+        const tbody = document.createElement("tbody");
+        for (const a of articles) {
+          const dateStr = new Date(a.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+          const words = a.wordCount ? a.wordCount.toLocaleString() : "—";
+          const tr = document.createElement("tr");
+          tr.onclick = () => openArticle(a._id);
+          tr.innerHTML = `
+            <td class="at-title">${escHtml(a.title || "Untitled Article")}</td>
+            <td class="at-topic">${escHtml(a.topic || "—")}</td>
+            <td class="at-words">${words}</td>
+            <td class="at-date">${dateStr}</td>
+            <td class="at-actions" onclick="event.stopPropagation()">
+              <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event,'${a._id}',${JSON.stringify(a.title)})">✕</button>
+            </td>`;
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        container.innerHTML = "";
+        container.appendChild(table);
+        return;
+      }
+
+      // Card view (default)
       const grid = document.createElement("div");
       grid.className = "articles-grid";
 
