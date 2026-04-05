@@ -263,6 +263,7 @@
     .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
     .suggestion-chip { background: var(--ai-light); border: 1px solid var(--ai-border); color: var(--ai); border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
     .suggestion-chip:hover { background: var(--ai); color: #fff; }
+    .suggestion-chip.chip-selected { background: var(--ai); color: #fff; border-color: var(--ai); }
 
     /* ── Context Grounding Warning ── */
     .grounding-warning { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; margin-bottom: 8px; }
