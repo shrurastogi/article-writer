@@ -134,6 +134,11 @@
     .section-wc { font-size: 0.72rem; color: var(--muted); background: var(--bg); padding: 2px 8px; border-radius: 10px; }
     .section-body { display: none; padding: 0 14px 14px; }
     .section-panel.open .section-body { display: block; }
+    .drag-handle { cursor: grab; font-size: 1rem; color: var(--muted); padding: 0 4px 0 0; line-height: 1; user-select: none; }
+    .drag-handle:hover { color: var(--secondary); }
+    .drag-handle:active { cursor: grabbing; }
+    .section-panel.dragging { opacity: 0.45; }
+    .section-panel.drag-over { outline: 2px dashed var(--primary); outline-offset: 2px; background: rgba(243,102,51,0.04); }
 
     .notes-input {
       width: 100%; padding: 6px 10px; border: 1px dashed var(--border);

@@ -30,6 +30,7 @@ const state = {
 
 const refinementHistory = {};  // { [sectionId]: string[] }
 let tableModalSectionId = null;
+let dragSourceId = null;
 let autoSaveTimer = null;
 const articleId = new URLSearchParams(window.location.search).get("id");
 
@@ -98,6 +99,46 @@ function renumberSections() {
   });
 }
 
+// ── Drag-and-drop section reorder ──
+function onDragStart(e, id) {
+  dragSourceId = id;
+  e.stopPropagation();
+  setTimeout(() => document.getElementById(`section-${id}`)?.classList.add("dragging"), 0);
+}
+
+function onDragOver(e, id) {
+  e.preventDefault();
+  if (id && id !== dragSourceId) {
+    document.querySelectorAll(".section-panel").forEach(el => el.classList.remove("drag-over"));
+    document.getElementById(`section-${id}`)?.classList.add("drag-over");
+  }
+}
+
+function onDrop(e, targetId) {
+  e.preventDefault();
+  if (!dragSourceId || dragSourceId === targetId) return;
+  reorderSection(dragSourceId, targetId);
+}
+
+function onDragEnd(e) {
+  document.querySelectorAll(".section-panel").forEach(el => {
+    el.classList.remove("dragging");
+    el.classList.remove("drag-over");
+  });
+  dragSourceId = null;
+}
+
+function reorderSection(fromId, toId) {
+  const fromIdx = SECTIONS.findIndex(s => s.id === fromId);
+  const toIdx   = SECTIONS.findIndex(s => s.id === toId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = SECTIONS.splice(fromIdx, 1);
+  SECTIONS.splice(toIdx, 0, moved);
+  renumberSections();
+  renderSections();
+  scheduleAutoSave();
+}
+
 // ── Render accordion sections ──
 function renderSections() {
   renumberSections();
@@ -109,9 +150,10 @@ function renderSections() {
   container.innerHTML = SECTIONS.map(s => {
     const titleEsc = s.title.replace(/'/g, "\\'");
     return `
-    <div class="section-panel" id="section-${s.id}">
+    <div class="section-panel" id="section-${s.id}" ondragover="onDragOver(event,'${s.id}')" ondrop="onDrop(event,'${s.id}')">
       <div class="section-head" onclick="toggleSection('${s.id}')">
         <div class="section-head-left">
+          <span class="drag-handle" draggable="true" ondragstart="onDragStart(event,'${s.id}')" ondragend="onDragEnd(event)" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
           <span class="section-toggle">▶</span>
           ${s.num ? `<span class="section-num">${s.num}.</span>` : ""}
           <span class="section-name">${s.title}</span>
