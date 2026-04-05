@@ -55,6 +55,10 @@
           <label>Keywords <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label>
           <input type="text" id="keywords" placeholder="Multiple myeloma, plasma cell disorder, IMiD, proteasome inhibitor, CAR-T, bispecific antibody" oninput="updateMeta()" />
         </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <input type="checkbox" id="strict-mode-toggle" onchange="onStrictModeChange()" />
+          <label for="strict-mode-toggle" style="margin:0;font-size:0.82rem;color:var(--secondary);cursor:pointer">Strict mode — require references for AI generation</label>
+        </div>
       </div>
     </div>
 
