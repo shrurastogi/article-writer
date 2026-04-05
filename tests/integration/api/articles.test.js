@@ -196,3 +196,34 @@ describe("DELETE /api/articles/:id", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ── POST /api/articles/:id/clone ──────────────────────────────────────────────
+
+describe("POST /api/articles/:id/clone", () => {
+  it("creates a copy with 'Copy of' prefix, new _id, same sections, returns 201", async () => {
+    const agent = await authenticatedAgent("clone-owner@example.com");
+    const create = await agent.post("/api/articles").send();
+    const id = create.body.article._id;
+    await agent.put(`/api/articles/${id}`).send({ title: "My Article", sections: { introduction: { prose: "Intro text." } } });
+
+    const res = await agent.post(`/api/articles/${id}/clone`);
+    expect(res.status).toBe(201);
+    expect(res.body.article._id).not.toBe(id);
+    expect(res.body.article.title).toBe("Copy of My Article");
+  });
+
+  it("returns 404 for a non-existent article", async () => {
+    const agent = await authenticatedAgent("clone-404@example.com");
+    const fakeId = new mongoose.Types.ObjectId();
+    const res = await agent.post(`/api/articles/${fakeId}/clone`);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when cloning another user's article", async () => {
+    const agent1 = await authenticatedAgent("clone-owner2@example.com");
+    const agent2 = await authenticatedAgent("clone-other@example.com");
+    const create = await agent1.post("/api/articles");
+    const res = await agent2.post(`/api/articles/${create.body.article._id}/clone`);
+    expect(res.status).toBe(403);
+  });
+});

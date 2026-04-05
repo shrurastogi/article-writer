@@ -90,6 +90,32 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// ── POST /api/articles/:id/clone — deep-copy an article ──────────────────────
+
+router.post("/:id/clone", async (req, res) => {
+  try {
+    const original = await Article.findById(req.params.id);
+    if (!original) return res.status(404).json({ error: "Article not found." });
+    if (!original._userId.equals(req.user._id)) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
+
+    const data = original.toObject();
+    delete data._id;
+    delete data.__v;
+    data.title = `Copy of ${data.title || "Untitled Article"}`;
+    data.createdAt = new Date();
+    data.updatedAt = new Date();
+
+    const cloned = await Article.create(data);
+    logger.info({ msg: "Article cloned", originalId: req.params.id, newId: cloned._id.toString(), userId: req.user._id.toString() });
+    res.status(201).json({ article: cloned });
+  } catch (err) {
+    logger.error({ msg: "Clone article error", error: err.message, articleId: req.params.id });
+    res.status(500).json({ error: "Failed to clone article." });
+  }
+});
+
 // ── DELETE /api/articles/:id ──────────────────────────────────────────────────
 
 router.delete("/:id", async (req, res) => {
