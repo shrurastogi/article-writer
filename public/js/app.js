@@ -38,6 +38,7 @@ const articleId = new URLSearchParams(window.location.search).get("id");
   await checkAuth();
   await loadArticle();
   renderSections();
+  renderConfidenceBars();
   updatePreview();
 })();
 
@@ -85,6 +86,7 @@ function renderSections() {
           <button class="btn btn-outline btn-sm" onclick="expandToProse('${s.id}','${titleEsc}')">✍ Expand to Prose</button>
           <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${titleEsc}')">💡 Key Points</button>
           <button class="btn btn-outline btn-sm" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
+          <div class="confidence-bar" id="conf-${s.id}"></div>
         </div>
         <div class="ai-box" id="ai-${s.id}">
           <div class="ai-box-header">
@@ -866,24 +868,45 @@ function renderLibrary() {
       </div>
     </div>
   `).join("");
+  renderConfidenceBars();
 }
 
 function removeFromLibrary(pmid) {
   state.library = state.library.filter(e => e.pmid !== pmid);
   state.library.forEach((e, i) => e.refNumber = i + 1);
   renderLibrary();
+  renderConfidenceBars();
   updatePreview();
   scheduleAutoSave();
 }
 
 function toggleLibrarySelect(pmid) {
   const entry = state.library.find(e => e.pmid === pmid);
-  if (entry) { entry.selected = !entry.selected; renderLibrary(); }
+  if (entry) { entry.selected = !entry.selected; renderLibrary(); renderConfidenceBars(); }
 }
 
 function selectAllLibrary(val) {
   state.library.forEach(e => e.selected = val);
   renderLibrary();
+  renderConfidenceBars();
+}
+
+// ── AI Confidence Indicator ──
+function renderConfidenceBars() {
+  const count = state.library.filter(e => e.selected).length;
+  const cls = count === 0 ? "conf-red" : count <= 2 ? "conf-yellow" : "conf-green";
+  const pmids = state.library.filter(e => e.selected).map(e => `PMID:${e.pmid}`).join(", ") || "none";
+  const label = count === 0 ? "⚠ No sources selected"
+    : count === 1 ? "1 source selected"
+    : `${count} sources selected`;
+  SECTIONS.forEach(s => {
+    const el = document.getElementById(`conf-${s.id}`);
+    if (el) {
+      el.className = `confidence-bar ${cls}`;
+      el.title = pmids;
+      el.textContent = label;
+    }
+  });
 }
 
 function syncReferencesSection() {
