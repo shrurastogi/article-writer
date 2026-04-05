@@ -85,4 +85,3 @@
         btn.textContent = "Create account";
       }
     }
-  </script>
