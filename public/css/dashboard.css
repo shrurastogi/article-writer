@@ -271,6 +271,19 @@
     .btn-delete:hover { background: #a93226; }
     .btn-delete:disabled { opacity: 0.6; cursor: not-allowed; }
 
+    /* ── Filter bar ── */
+    .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 10px; }
+    .filter-group { display: flex; flex-direction: column; gap: 3px; }
+    .filter-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .filter-input { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; color: var(--text); background: #fff; outline: none; }
+    .filter-input:focus { border-color: var(--primary); }
+    .btn-clear-filters { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; background: #fff; color: var(--text-muted); cursor: pointer; }
+    .btn-clear-filters:hover { border-color: var(--danger); color: var(--danger); }
+    #filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .filter-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; color: var(--text-muted); }
+    .filter-chip-x { cursor: pointer; font-size: 0.7rem; color: var(--text-muted); }
+    .filter-chip-x:hover { color: var(--danger); }
+
     /* ── View toggle ── */
     .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
     .view-btn { background: #fff; border: none; padding: 6px 10px; font-size: 1rem; cursor: pointer; color: var(--text-muted); line-height: 1; transition: background 0.15s, color 0.15s; }

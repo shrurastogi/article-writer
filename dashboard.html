@@ -36,6 +36,27 @@
       </div>
     </div>
 
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label class="filter-label">Search</label>
+        <input class="filter-input" id="filter-text" type="text" placeholder="Title or topic…" oninput="applyFilters()" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">From</label>
+        <input class="filter-input" id="filter-date-from" type="date" onchange="applyFilters()" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">To</label>
+        <input class="filter-input" id="filter-date-to" type="date" onchange="applyFilters()" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Min words</label>
+        <input class="filter-input" id="filter-words-min" type="number" min="0" placeholder="0" oninput="applyFilters()" style="width:80px" />
+      </div>
+      <button class="btn-clear-filters" id="btn-clear-filters" onclick="clearFilters()" style="display:none">✕ Clear</button>
+    </div>
+    <div id="filter-chips"></div>
+
     <div id="articles-container">
       <!-- Loading skeletons -->
       <div class="articles-grid" id="skeleton-grid">
