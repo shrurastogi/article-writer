@@ -247,6 +247,51 @@ Delete a version.
 
 ---
 
+## Settings
+
+### GET /api/settings
+Return current user settings (no encrypted values returned).
+
+**Response:** `200 OK`
+```json
+{
+  "llmConfig": { "provider": "groq", "model": "", "hasKey": false },
+  "researchConfig": { "hasNcbiKey": false },
+  "preferences": { "theme": "light", "fontSize": 14, "language": "English", "strictMode": false }
+}
+```
+
+---
+
+### PUT /api/settings
+Update LLM provider/model/apiKey, NCBI key, or UI preferences. Only provided fields are updated.
+
+**Body:** `{ "provider", "model", "apiKey", "ncbiKey", "preferences": { "theme", "fontSize", "language", "strictMode" } }`  
+**Response:** `200 OK` — same shape as GET /api/settings
+
+---
+
+### DELETE /api/settings/llm-key
+Remove the stored LLM API key (falls back to system key).
+
+**Response:** `200 OK` `{ "hasKey": false }`
+
+---
+
+### DELETE /api/settings/ncbi-key
+Remove the stored NCBI API key.
+
+**Response:** `200 OK` `{ "hasNcbiKey": false }`
+
+---
+
+### GET /api/llm/models
+List available LLM models for the Groq provider.
+
+**Response:** `200 OK` `{ "models": [{ "id": "llama-3.3-70b-versatile", "name": "..." }, ...] }`
+
+---
+
 ## Utility
 
 ### GET /api/version
