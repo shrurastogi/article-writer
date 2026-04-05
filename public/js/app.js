@@ -450,10 +450,32 @@ function closeAiBox(id) {
 }
 
 // ── PDF export ──
-function downloadPDF() {
+async function downloadPDF() {
   const title = document.getElementById("article-title").value || "article";
-  const el = document.getElementById("article-preview");
+  const html = document.getElementById("article-preview").innerHTML;
+  showToast("Generating PDF...");
+  try {
+    const resp = await fetch("/api/export-pdf-server", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html, title }),
+    });
+    if (!resp.ok) throw new Error("server unavailable");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("PDF downloaded!", "success");
+  } catch {
+    _downloadPDFFallback(title);
+  }
+}
 
+function _downloadPDFFallback(title) {
+  const el = document.getElementById("article-preview");
   const opt = {
     margin: 0,
     filename: `${title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_").slice(0, 60)}.pdf`,
@@ -462,8 +484,6 @@ function downloadPDF() {
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     pagebreak: { mode: ["avoid-all", "css", "legacy"] },
   };
-
-  showToast("Generating PDF...");
   html2pdf().set(opt).from(el).save().then(() => showToast("PDF downloaded!", "success"));
 }
 
