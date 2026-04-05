@@ -8,6 +8,7 @@ const passport = require("passport");
 const mongoose = require("mongoose");
 const logger = require("./utils/logger");
 const { requireAuth } = require("./middleware/auth");
+const aiRateLimit = require("./middleware/rateLimit");
 require("./lib/passport-config");
 
 const app = express();
@@ -59,7 +60,7 @@ app.use(express.static(path.join(__dirname, ".."), { index: false }));
 // ── API routers ───────────────────────────────────────────────────────────────
 app.use("/auth", require("./routes/auth"));
 app.use("/api/articles", require("./routes/articles"));
-app.use("/api", require("./routes/ai"));
+app.use("/api", aiRateLimit, require("./routes/ai"));
 app.use("/api", require("./routes/pubmed"));
 app.use("/api", require("./routes/export"));
 
