@@ -7,7 +7,7 @@ const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -22,8 +22,11 @@ router.post("/generate", async (req, res) => {
   const userContextText = userContext?.trim()
     ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
     : "";
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
+  const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
 - Formal academic writing style suitable for a high-impact journal (e.g. NEJM, Lancet, JCO)
@@ -56,7 +59,7 @@ Requirements:
 
 // Improve existing section text
 router.post("/improve", async (req, res) => {
-  const { topic, sectionTitle, content, pubmedContext, userContext } = req.body;
+  const { topic, sectionTitle, content, pubmedContext, userContext, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -72,8 +75,11 @@ router.post("/improve", async (req, res) => {
   const userContextText = userContext?.trim()
     ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
     : "";
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
+  const prompt = `${languagePrefix}You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
 
 Make it:
 - More academically rigorous and precise in language
@@ -111,7 +117,7 @@ ${content}`;
 
 // Suggest key points to cover in a section
 router.post("/keypoints", async (req, res) => {
-  const { topic, sectionId, sectionTitle, pubmedContext, userContext } = req.body;
+  const { topic, sectionId, sectionTitle, pubmedContext, userContext, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -125,8 +131,11 @@ router.post("/keypoints", async (req, res) => {
   const userContextText = userContext?.trim()
     ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
     : "";
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.
+  const prompt = `${languagePrefix}You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.
 
 Include:
 - Critical concepts and mechanisms
@@ -162,7 +171,7 @@ Format as a clear bulleted list. Each point must be specific and actionable, not
 
 // Generate an HTML table for a section
 router.post("/generate-table", async (req, res) => {
-  const { topic, sectionTitle, tableDescription, pubmedContext } = req.body;
+  const { topic, sectionTitle, tableDescription, pubmedContext, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -174,8 +183,11 @@ router.post("/generate-table", async (req, res) => {
   const litText = pubmedContext?.trim()
     ? `\nPubMed context (use data from these abstracts where possible):\n${pubmedContext}`
     : "";
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are an expert medical writer creating a publication-quality data table.
+  const prompt = `${languagePrefix}You are an expert medical writer creating a publication-quality data table.
 
 Section: ${sectionTitle} in a review article on ${topic}
 Table request: ${tableDescription}${litText}
@@ -219,7 +231,7 @@ Example structure:
 
 // Refine an existing draft section with a user instruction
 router.post("/refine", async (req, res) => {
-  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext } = req.body;
+  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -237,8 +249,11 @@ router.post("/refine", async (req, res) => {
   const userContextText = userContext?.trim()
     ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
     : "";
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are an expert medical writer specializing in ${topic}.
+  const prompt = `${languagePrefix}You are an expert medical writer specializing in ${topic}.
 The user has a draft of the "${sectionTitle}" section and wants to refine it with the following instruction:
 
 Instruction: ${instruction}
@@ -273,7 +288,7 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
 
 // Check full-paper coherence and flow
 router.post("/coherence-check", async (req, res) => {
-  const { topic, sections } = req.body;
+  const { topic, sections, language } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -285,8 +300,11 @@ router.post("/coherence-check", async (req, res) => {
   const sectionBlock = sections
     .map(s => `### ${s.title}\n${(s.prose || "").slice(0, 2000)}${s.prose?.length > 2000 ? "\n[...truncated]" : ""}`)
     .join("\n\n");
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
 
-  const prompt = `You are a senior scientific editor reviewing a full draft review article on "${topic.trim()}" for coherence, logical flow, and narrative consistency.
+  const prompt = `${languagePrefix}You are a senior scientific editor reviewing a full draft review article on "${topic.trim()}" for coherence, logical flow, and narrative consistency.
 
 Here is the full article draft:
 

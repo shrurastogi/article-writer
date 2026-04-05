@@ -64,6 +64,13 @@ describe("POST /api/generate", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
+
+  it("accepts language field without error", async () => {
+    const res = await request(app)
+      .post("/api/generate")
+      .send({ topic: "Multiple Myeloma", sectionId: "intro", sectionTitle: "Introduction", language: "Spanish" });
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("POST /api/improve", () => {

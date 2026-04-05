@@ -7,6 +7,7 @@ const articleSchema = new mongoose.Schema({
   authors:       { type: String, default: "" },
   keywords:      { type: String, default: "" },
   wordCount:     { type: Number, default: 0 },
+  language:      { type: String, default: "English" },
   sections:      { type: mongoose.Schema.Types.Mixed, default: {} },
   library:       { type: Array, default: [] },
   customSections:{ type: Array, default: [] },
@@ -39,6 +40,6 @@ articleSchema.methods.computeWordCount = function () {
 };
 
 // Summary projection for dashboard list (no sections/library)
-articleSchema.statics.SUMMARY_FIELDS = "_id title topic wordCount updatedAt createdAt";
+articleSchema.statics.SUMMARY_FIELDS = "_id title topic wordCount language updatedAt createdAt";
 
 module.exports = mongoose.model("Article", articleSchema);
