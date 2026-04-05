@@ -67,7 +67,7 @@ function renderSections() {
   const container = document.getElementById("sections-container");
   // Ensure state exists for every section
   SECTIONS.forEach(s => {
-    if (!state.sections[s.id]) state.sections[s.id] = { prose: "", tables: [] };
+    if (!state.sections[s.id]) state.sections[s.id] = { prose: "", tables: [], userContext: "" };
   });
   container.innerHTML = SECTIONS.map(s => {
     const titleEsc = s.title.replace(/'/g, "\\'");
@@ -102,6 +102,20 @@ function renderSections() {
           onclick="event.stopPropagation()"
           spellcheck="true"
         />
+        <div class="user-ctx-toggle" onclick="toggleUserCtx('${s.id}');event.stopPropagation()">
+          <span class="user-ctx-hint">+ Add Your Data</span>
+          <span class="user-ctx-chevron" id="user-ctx-chevron-${s.id}">▶</span>
+        </div>
+        <div class="user-ctx-body" id="user-ctx-body-${s.id}" style="display:none">
+          <textarea
+            class="user-ctx-input"
+            id="user-ctx-${s.id}"
+            rows="4"
+            placeholder="Paste your own data, patient numbers, trial results, statistics, or notes here. AI will treat this as authoritative when generating content for this section."
+            oninput="updateUserCtx('${s.id}', this.value)"
+            spellcheck="true"
+          ></textarea>
+        </div>
         <div class="section-ai-actions">
           <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${titleEsc}')">✨ Generate Draft</button>
           <button class="btn btn-ai btn-sm" onclick="improveSection('${s.id}','${titleEsc}')">✨ Improve</button>
@@ -138,6 +152,14 @@ function renderSections() {
   SECTIONS.forEach(s => {
     const el = document.getElementById(`content-${s.id}`);
     if (el) el.value = state.sections[s.id]?.prose || "";
+    const ctxEl = document.getElementById(`user-ctx-${s.id}`);
+    if (ctxEl) {
+      ctxEl.value = state.sections[s.id]?.userContext || "";
+      if (ctxEl.value) {
+        document.getElementById(`user-ctx-body-${s.id}`).style.display = "block";
+        document.getElementById(`user-ctx-chevron-${s.id}`).textContent = "▼";
+      }
+    }
     updateWordCount(s.id);
     renderSectionTables(s.id);
   });
@@ -325,8 +347,9 @@ function generateDraft(id, title) {
   const notes = document.getElementById(`notes-${id}`)?.value || "";
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
+  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext }, id, "✨ Generated Draft", true, warn);
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
@@ -335,16 +358,18 @@ function improveSection(id, title) {
   if (!content?.trim()) { showToast("Please write something in this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
+  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext }, id, "✨ Improved Text", true, warn);
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext }, id, "✨ Improved Text", true, warn);
 }
 
 function getKeyPoints(id, title) {
   if (!checkContextGrounding(id)) return;
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
+  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext }, id, "💡 Key Points to Cover", false, warn);
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext }, id, "💡 Key Points to Cover", false, warn);
 }
 
 async function checkCoherence() {
@@ -477,6 +502,7 @@ function expandToProse(id, title) {
   if (!prose.trim()) { showToast("Paste your bullet points or rough notes into this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
+  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
   streamToAiBox("/api/refine", {
     topic,
@@ -484,6 +510,7 @@ function expandToProse(id, title) {
     currentDraft: prose,
     instruction: "Convert these bullet points and rough notes into flowing, formal academic prose suitable for a peer-reviewed journal review article. Preserve every piece of information provided, expand key points with appropriate context, add smooth transitions between ideas, and insert [Author et al., Year] citation placeholders where evidence is implied. Do not invent facts not present in the input.",
     pubmedContext,
+    userContext,
   }, id, "✍ Expanded Prose", true, warn);
 }
 
@@ -710,9 +737,10 @@ function applyArticleData(data) {
       const tables = typeof val === "object" ? (val?.tables || []) : [];
       const targetId = LEGACY_REMAP[id] || id;
 
+      const userContext = typeof val === "object" ? (val?.userContext || "") : "";
       if (knownIds.has(targetId)) {
         // Known section (possibly remapped from a legacy key)
-        state.sections[targetId] = { prose, tables };
+        state.sections[targetId] = { prose, tables, userContext };
       } else if (prose.trim() || tables.length) {
         // Unknown legacy section with content — restore as a custom section
         if (!SECTIONS.find(s => s.id === id)) {
@@ -720,7 +748,7 @@ function applyArticleData(data) {
           SECTIONS.splice(refIdx, 0, { id, num: "", title, placeholder: `Write about ${title}...`, isCustom: true });
           knownIds.add(id);
         }
-        state.sections[id] = { prose, tables };
+        state.sections[id] = { prose, tables, userContext };
       }
     }
   }
@@ -1095,6 +1123,22 @@ function deleteSection(id) {
   renumberSections();
   renderSections();
   updatePreview();
+  scheduleAutoSave();
+}
+
+function toggleUserCtx(id) {
+  const body = document.getElementById(`user-ctx-body-${id}`);
+  const chevron = document.getElementById(`user-ctx-chevron-${id}`);
+  if (!body) return;
+  const open = body.style.display === "block";
+  body.style.display = open ? "none" : "block";
+  chevron.textContent = open ? "▶" : "▼";
+  if (!open) document.getElementById(`user-ctx-${id}`)?.focus();
+}
+
+function updateUserCtx(id, value) {
+  if (!state.sections[id]) state.sections[id] = { prose: "", tables: [], userContext: "" };
+  state.sections[id].userContext = value;
   scheduleAutoSave();
 }
 
