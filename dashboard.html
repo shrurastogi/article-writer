@@ -25,9 +25,15 @@
   <main>
     <div class="page-header">
       <h1>My Articles</h1>
-      <button class="btn-new" id="btn-new" onclick="createArticle()">
-        <span class="plus">+</span> New article
-      </button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="view-toggle">
+          <button class="view-btn active" id="view-btn-card" title="Card view" onclick="setView('card')">⊞</button>
+          <button class="view-btn" id="view-btn-list" title="List view" onclick="setView('list')">☰</button>
+        </div>
+        <button class="btn-new" id="btn-new" onclick="createArticle()">
+          <span class="plus">+</span> New article
+        </button>
+      </div>
     </div>
 
     <div id="articles-container">
