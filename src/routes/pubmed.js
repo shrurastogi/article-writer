@@ -2,7 +2,7 @@
 
 const router = require("express").Router();
 const { NCBI_BASE, NCBI_API_KEY, fetchWithRetry, parsePubMedXML } = require("../services/pubmedService");
-const logger = require("../../lib/logger");
+const logger = require("../utils/logger");
 
 // Search PubMed for relevant abstracts
 router.post("/pubmed-search", async (req, res) => {

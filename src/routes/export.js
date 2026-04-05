@@ -2,7 +2,7 @@
 
 const router = require("express").Router();
 const { buildDocx } = require("../services/exportService");
-const logger = require("../../lib/logger");
+const logger = require("../utils/logger");
 
 // Export as Word DOCX
 router.post("/export-docx", async (req, res) => {
