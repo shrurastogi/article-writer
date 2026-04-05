@@ -1449,6 +1449,130 @@ function enhanceCitations(text, library) {
   });
 }
 
+// ── One-click full draft ──
+let draftAbortController = null;
+
+async function startFullDraft() {
+  const topic = getTopic();
+  if (!topic) { showToast("Set a Medical Topic first.", "error"); return; }
+
+  const sectionsPayload = SECTIONS
+    .filter(s => s.id !== "references")
+    .map(s => ({
+      id: s.id,
+      title: s.title,
+      notes: document.getElementById(`notes-${s.id}`)?.value || "",
+      userContext: state.sections[s.id]?.userContext || "",
+    }));
+
+  const modal = document.getElementById("draft-progress-modal");
+  const list = document.getElementById("draft-section-list");
+  const subtitle = document.getElementById("draft-progress-subtitle");
+
+  modal.classList.add("open");
+  subtitle.textContent = "Generating drafts for each section…";
+  list.innerHTML = sectionsPayload.map(s =>
+    `<div class="draft-section-row" id="drow-${s.id}">
+      <div class="draft-section-row-title">${escHtml(s.title)}</div>
+      <span class="draft-section-status" id="dstatus-${s.id}">Queued</span>
+    </div>`
+  ).join("");
+
+  draftAbortController = new AbortController();
+
+  try {
+    const resp = await fetch("/api/agent/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic,
+        sections: sectionsPayload,
+        language: getLanguage(),
+        pubmedContext: getSelectedPubmedContext(),
+      }),
+      signal: draftAbortController.signal,
+    });
+
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          handleDraftEvent(evt);
+        } catch { /* partial line */ }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      showToast("Draft generation failed: " + err.message, "error");
+    }
+    modal.classList.remove("open");
+  }
+}
+
+function handleDraftEvent(evt) {
+  const list = document.getElementById("draft-section-list");
+  const subtitle = document.getElementById("draft-progress-subtitle");
+
+  if (evt.type === "section_start") {
+    const statusEl = document.getElementById(`dstatus-${evt.id}`);
+    if (statusEl) statusEl.textContent = "Generating…";
+  } else if (evt.type === "section_done") {
+    const row = document.getElementById(`drow-${evt.id}`);
+    if (row) {
+      const preview = evt.content.slice(0, 120).replace(/\n/g, " ");
+      row.innerHTML = `
+        <div class="draft-section-row-title">${escHtml(evt.title)}</div>
+        <div class="draft-section-preview">${escHtml(preview)}…</div>
+        <div class="draft-section-actions">
+          <button class="btn btn-ai btn-sm" onclick="approveDraftSection('${evt.id}',${JSON.stringify(evt.content)})">Apply</button>
+          <button class="btn btn-secondary btn-sm" onclick="skipDraftSection('${evt.id}')">Skip</button>
+        </div>`;
+    }
+  } else if (evt.type === "complete") {
+    subtitle.textContent = "All sections generated. Review and apply below.";
+  } else if (evt.type === "error") {
+    showToast("Error: " + evt.message, "error");
+  }
+}
+
+function approveDraftSection(id, content) {
+  state.sections[id] = state.sections[id] || { prose: "", tables: [], userContext: "" };
+  state.sections[id].prose = content;
+  const textarea = document.getElementById(`content-${id}`);
+  if (textarea) textarea.value = content;
+  updateWordCount(id);
+  updatePreview();
+  scheduleAutoSave();
+  const row = document.getElementById(`drow-${id}`);
+  if (row) {
+    row.querySelector(".draft-section-actions").innerHTML = '<span style="color:#16a34a;font-size:0.8rem;font-weight:600">✓ Applied</span>';
+  }
+}
+
+function skipDraftSection(id) {
+  const row = document.getElementById(`drow-${id}`);
+  if (row) {
+    row.querySelector(".draft-section-actions").innerHTML = '<span style="color:var(--muted);font-size:0.8rem">Skipped</span>';
+  }
+}
+
+function cancelFullDraft() {
+  draftAbortController?.abort();
+  document.getElementById("draft-progress-modal").classList.remove("open");
+}
+
 fetch('/api/version').then(r => r.json()).then(v => {
   const isDev = v.env !== 'production';
   const badge = document.createElement('div');
