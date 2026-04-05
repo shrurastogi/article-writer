@@ -299,6 +299,23 @@ Review the full article for flow and narrative consistency.
 
 ---
 
+### POST /api/grammar-check
+Check a section for grammar and style issues (passive voice, long sentences, informal language, hedging).
+
+**Request**
+```json
+{
+  "content": "string (required)",
+  "topic": "string (optional)",
+  "sectionTitle": "string (optional)",
+  "language": "string (optional, default: English)"
+}
+```
+**Response:** `text/plain` stream. Each issue on its own line: `ISSUE | TYPE | fragment | suggestion`. Returns `NO_ISSUES` if none found.
+**Errors:** `400` missing content.
+
+---
+
 ## PubMed Endpoints (JSON)
 
 ### POST /api/pubmed-search

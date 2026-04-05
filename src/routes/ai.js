@@ -330,6 +330,62 @@ Be direct and specific. Do not pad with generic praise.`;
   }
 });
 
+// Grammar and style check for a section
+router.post("/grammar-check", async (req, res) => {
+  const { content, topic, sectionTitle, language } = req.body;
+
+  if (!content?.trim()) {
+    return res.status(400).json({ error: "Section content is required." });
+  }
+
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
+
+  const prompt = `${languagePrefix}You are a scientific copy-editor reviewing a section of a medical review article for grammar and style issues.
+
+Section: "${sectionTitle || "Untitled"}"
+Topic: "${topic?.trim() || "medical"}"
+
+Content to review:
+"""
+${content.trim().slice(0, 3000)}
+"""
+
+Check for these issue types only: PASSIVE_VOICE, LONG_SENTENCE, INFORMAL, HEDGING.
+
+For each issue found, output exactly one line in this format:
+ISSUE | <TYPE> | <exact fragment from text, max 15 words> | <brief suggestion>
+
+If no issues are found, output exactly: NO_ISSUES
+
+Rules:
+- Output ONLY the ISSUE lines or NO_ISSUES — no other text, no preamble, no explanations.
+- Limit to the 5 most important issues.
+- Fragment must be a verbatim substring of the input text.`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await getClient().chat.completions.create({
+      model: MODEL,
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    logger.error({ msg: "Groq API error", error: err.message });
+    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+  }
+});
+
 // Suggest relevant section names for a review article
 router.post("/suggest-sections", async (req, res) => {
   const { topic, existingSections } = req.body;
