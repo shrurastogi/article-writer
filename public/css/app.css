@@ -340,3 +340,7 @@
     .conf-red    { background: #fee2e2; color: #dc2626; }
     .conf-yellow { background: #fef9c3; color: #b45309; }
     .conf-green  { background: #dcfce7; color: #16a34a; }
+
+
+    /* ── View-only Mode Banner ── */
+    .view-mode-banner { background: var(--warning-bg, #fffbeb); border-bottom: 1px solid #fcd34d; color: #92400e; padding: 6px 16px; font-size: 0.8rem; font-weight: 500; border-radius: 6px; margin-right: 8px; }

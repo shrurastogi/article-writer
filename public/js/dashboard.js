@@ -161,13 +161,14 @@
           const dateStr = new Date(a.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
           const words = a.wordCount ? a.wordCount.toLocaleString() : "—";
           const tr = document.createElement("tr");
-          tr.onclick = () => openArticle(a._id);
+          tr.onclick = () => openArticle(a._id, a.isLocked);
           tr.innerHTML = `
-            <td class="at-title">${escHtml(a.title || "Untitled Article")}</td>
+            <td class="at-title">${escHtml(a.title || "Untitled Article")}${a.isLocked ? ' <span class="lock-badge">Locked</span>' : ""}</td>
             <td class="at-topic">${escHtml(a.topic || "—")}</td>
             <td class="at-words">${words}</td>
             <td class="at-date">${dateStr}</td>
             <td class="at-actions" onclick="event.stopPropagation()">
+              <button class="lock-btn" title="${a.isLocked ? "Unlock" : "Lock"}" onclick="toggleLock(event,'${a._id}',${!!a.isLocked})">${a.isLocked ? "🔒" : "🔓"}</button>
               <button class="clone-btn" title="Clone article" onclick="cloneArticle(event,'${a._id}')">⧉</button>
               <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event,'${a._id}',${JSON.stringify(a.title)})">✕</button>
             </td>`;
@@ -185,19 +186,22 @@
 
       for (const a of displayList) {
         const card = document.createElement("div");
-        card.className = "article-card";
-        card.onclick = () => openArticle(a._id);
+        card.className = "article-card" + (a.isLocked ? " is-locked" : "");
+        card.onclick = () => openArticle(a._id, a.isLocked);
 
         const updated = new Date(a.updatedAt);
         const dateStr = updated.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
         const words = a.wordCount ? `${a.wordCount.toLocaleString()} words` : "No content";
+        const lockLabel = a.isLocked ? "🔒" : "🔓";
+        const lockTitle = a.isLocked ? "Unlock article" : "Lock article";
 
         card.innerHTML = `
           <div class="card-actions">
+            <button class="lock-btn" title="${lockTitle}" onclick="toggleLock(event,'${a._id}',${!!a.isLocked})">${lockLabel}</button>
             <button class="clone-btn" title="Clone article" onclick="cloneArticle(event,'${a._id}')">⧉</button>
             <button class="delete-btn" title="Delete article" onclick="openDeleteModal(event, '${a._id}', ${JSON.stringify(a.title)})">✕</button>
           </div>
-          <div class="article-title">${escHtml(a.title || "Untitled Article")}</div>
+          <div class="article-title">${escHtml(a.title || "Untitled Article")}${a.isLocked ? ' <span class="lock-badge">Locked</span>' : ""}</div>
           <div class="article-topic">${escHtml(a.topic || "")}</div>
           <div class="article-meta">
             <span>Updated ${dateStr}</span>
@@ -230,8 +234,20 @@
       }
     }
 
-    function openArticle(id) {
-      window.location.href = `/?id=${id}`;
+    function openArticle(id, isLocked) {
+      window.location.href = isLocked ? `/?id=${id}&mode=view` : `/?id=${id}`;
+    }
+
+    async function toggleLock(e, id, currentlyLocked) {
+      e.stopPropagation();
+      const action = currentlyLocked ? "unlock" : "lock";
+      try {
+        const res = await fetch(`/api/articles/${id}/${action}`, { method: "POST" });
+        if (!res.ok) throw new Error("Failed");
+        await loadArticles();
+      } catch {
+        showToast(`Failed to ${action} article.`, "error");
+      }
     }
 
     // ── Delete modal ───────────────────────────────────────────────────────────

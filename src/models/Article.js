@@ -11,6 +11,17 @@ const articleSchema = new mongoose.Schema({
   sections:      { type: mongoose.Schema.Types.Mixed, default: {} },
   library:       { type: Array, default: [] },
   customSections:{ type: Array, default: [] },
+  isLocked:      { type: Boolean, default: false },
+  shareToken:    { type: String, sparse: true },
+  collaborators: [{
+    _userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    role:    { type: String, enum: ["viewer", "editor"] },
+  }],
+  writingStyle:  {
+    sampleText:   { type: String, default: "" },
+    styleProfile: { type: mongoose.Schema.Types.Mixed },
+    calibratedAt: { type: Date },
+  },
   createdAt:     { type: Date, default: Date.now },
   updatedAt:     { type: Date, default: Date.now },
 });
@@ -40,6 +51,6 @@ articleSchema.methods.computeWordCount = function () {
 };
 
 // Summary projection for dashboard list (no sections/library)
-articleSchema.statics.SUMMARY_FIELDS = "_id title topic wordCount language updatedAt createdAt";
+articleSchema.statics.SUMMARY_FIELDS = "_id title topic wordCount language isLocked updatedAt createdAt";
 
 module.exports = mongoose.model("Article", articleSchema);
