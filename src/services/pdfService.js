@@ -1,8 +1,8 @@
 "use strict";
 
-const puppeteer = require("puppeteer-core");
-
 async function generatePdf(html) {
+  // Lazy-require so a missing/broken puppeteer-core doesn't crash app startup
+  const puppeteer = require("puppeteer-core");
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
