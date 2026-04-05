@@ -40,10 +40,30 @@ const articleId = new URLSearchParams(window.location.search).get("id");
   renderSections();
   renderConfidenceBars();
   updatePreview();
+
+  // BUG-003: delegated listener for "Apply to Section" buttons in coherence output
+  document.getElementById("coherence-output")?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-action='apply-rec']");
+    if (!btn) return;
+    applyFlowRecommendation(btn.dataset.sectionId, btn.dataset.recText);
+  });
 })();
+
+// ── Section numbering ──
+function renumberSections() {
+  let num = 1;
+  SECTIONS.forEach(s => {
+    if (s.id === "abstract" || s.id === "references") {
+      s.num = "";
+    } else {
+      s.num = String(num++);
+    }
+  });
+}
 
 // ── Render accordion sections ──
 function renderSections() {
+  renumberSections();
   const container = document.getElementById("sections-container");
   // Ensure state exists for every section
   SECTIONS.forEach(s => {
@@ -396,7 +416,7 @@ function renderCoherenceWithActions(text) {
           const sectionId = inferSectionFromText(recText);
           const section = sectionId ? SECTIONS.find(s => s.id === sectionId) : null;
           const btnHtml = section
-            ? `<button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:0.75rem" onclick="applyFlowRecommendation('${section.id}', ${JSON.stringify(recText)})">Apply to ${htmlEsc(section.title)} ↗</button>`
+            ? `<button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:0.75rem" data-action="apply-rec" data-section-id="${section.id}" data-rec-text="${recText.replace(/"/g, "&quot;")}">Apply to ${htmlEsc(section.title)} ↗</button>`
             : "";
           html += `<div class="co-rec-card"><div class="co-rec-num">${recMatch[1]}.</div><div class="co-rec-body"><div>${htmlEsc(recText)}</div>${btnHtml}</div></div>`;
         } else if (line.trim()) {
@@ -707,6 +727,7 @@ function applyArticleData(data) {
     state.library = data.library;
     renderLibrary();
   }
+  renumberSections();
   SECTIONS.forEach(s => updateWordCount(s.id));
   updateTotalWordCount();
 }
@@ -1015,7 +1036,7 @@ async function openAddSectionModal() {
     if (suggestions?.length) {
       document.getElementById("suggestions-topic-label").textContent = topic;
       document.getElementById("section-suggestion-chips").innerHTML = suggestions
-        .map(s => `<button class="suggestion-chip" onclick="pickSuggestion(${JSON.stringify(s)})">${htmlEsc(s)}</button>`)
+        .map(s => `<button class="suggestion-chip" onclick="pickSuggestion(event,${JSON.stringify(s)})">${htmlEsc(s)}</button>`)
         .join("");
       document.getElementById("section-suggestions-area").style.display = "block";
     }
@@ -1026,9 +1047,13 @@ async function openAddSectionModal() {
   }
 }
 
-function pickSuggestion(title) {
-  document.getElementById("new-section-title").value = title;
-  document.getElementById("new-section-title").focus();
+function pickSuggestion(e, title) {
+  document.querySelectorAll(".suggestion-chip").forEach(c => c.classList.remove("chip-selected"));
+  e.currentTarget.classList.add("chip-selected");
+  const input = document.getElementById("new-section-title");
+  input.value = title;
+  input.dispatchEvent(new Event("input"));
+  input.focus();
 }
 
 function closeAddSectionModal() {
@@ -1053,6 +1078,7 @@ function addCustomSection(title, afterId) {
     : SECTIONS.findIndex(s => s.id === afterId) + 1;
   if (insertIdx <= 0 || insertIdx > refIdx) insertIdx = refIdx;
   SECTIONS.splice(insertIdx, 0, newSection);
+  renumberSections();
   renderSections();
   document.getElementById(`section-${id}`)?.classList.add("open");
   scheduleAutoSave();
@@ -1064,6 +1090,7 @@ function deleteSection(id) {
   if (!confirm(`Delete section "${s?.title}"? Content will be lost.`)) return;
   SECTIONS.splice(SECTIONS.findIndex(s => s.id === id), 1);
   delete state.sections[id];
+  renumberSections();
   renderSections();
   updatePreview();
   scheduleAutoSave();
