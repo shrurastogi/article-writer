@@ -2,7 +2,7 @@
 
 const express = require("express");
 const User = require("../models/User");
-const { encrypt, decrypt } = require("../services/encryptionService");
+const { encrypt } = require("../services/encryptionService");
 const logger = require("../utils/logger");
 const { requireApiAuth } = require("../middleware/auth");
 
