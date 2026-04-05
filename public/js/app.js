@@ -47,9 +47,31 @@ function toggleDarkMode() {
   applyTheme();
 }
 
+const FONT_SIZES = [12, 13, 14, 15, 16, 17, 18];
+const FONT_DEFAULT = 14;
+
+function applyFontSize(size) {
+  document.documentElement.style.setProperty("--base-font-size", size + "px");
+}
+
+function adjustFontSize(delta) {
+  if (delta === 0) {
+    localStorage.removeItem("font-size");
+    applyFontSize(FONT_DEFAULT);
+    return;
+  }
+  const current = parseInt(localStorage.getItem("font-size") || FONT_DEFAULT);
+  const idx = FONT_SIZES.indexOf(current);
+  const newIdx = Math.max(0, Math.min(FONT_SIZES.length - 1, idx + delta));
+  const newSize = FONT_SIZES[newIdx];
+  localStorage.setItem("font-size", newSize);
+  applyFontSize(newSize);
+}
+
 // ── Init ──
 (async () => {
   applyTheme();
+  applyFontSize(parseInt(localStorage.getItem("font-size") || FONT_DEFAULT));
   await checkAuth();
   await loadArticle();
   renderSections();

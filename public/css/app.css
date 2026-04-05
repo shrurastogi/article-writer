@@ -3,6 +3,7 @@
     :root {
       /* GSK Brand Colors */
       --primary: #F36633;
+      --base-font-size: 14px;
       --primary-dark: #D4551A;
       --secondary: #64748b;
       --bg: #f8f4f1;
@@ -46,7 +47,7 @@
     [data-theme="dark"] .coherence-panel { background: #16213e; border-color: #2d3561; }
     [data-theme="dark"] .user-ctx-input { background: #1a1a2e; color: var(--text); border-color: #2d3561; }
 
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: var(--base-font-size); }
 
     /* ── Header ── */
     header {
@@ -70,6 +71,9 @@
     .btn-dashboard:hover { background: var(--ai-light); }
     .btn-theme-toggle { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 1rem; cursor: pointer; line-height: 1; transition: background 0.15s; }
     .btn-theme-toggle:hover { background: var(--bg); }
+    .font-zoom-controls { display: flex; align-items: center; gap: 2px; }
+    .btn-font-zoom { background: transparent; border: 1px solid var(--border); color: var(--secondary); border-radius: 5px; padding: 3px 7px; font-size: 0.78rem; font-weight: 600; cursor: pointer; line-height: 1; transition: background 0.15s; white-space: nowrap; }
+    .btn-font-zoom:hover { background: var(--bg); color: var(--text); }
 
     /* ── Buttons ── */
     .btn {
