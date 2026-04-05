@@ -394,7 +394,7 @@ function generateDraft(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext }, id, "✨ Generated Draft", true, warn);
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage() }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
@@ -405,7 +405,7 @@ function improveSection(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext }, id, "✨ Improved Text", true, warn);
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage() }, id, "✨ Improved Text", true, warn);
 }
 
 function getKeyPoints(id, title) {
@@ -414,7 +414,7 @@ function getKeyPoints(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext }, id, "💡 Key Points to Cover", false, warn);
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext, language: getLanguage() }, id, "💡 Key Points to Cover", false, warn);
 }
 
 async function checkCoherence() {
@@ -442,7 +442,7 @@ async function checkCoherence() {
     const resp = await fetch("/api/coherence-check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, sections }),
+      body: JSON.stringify({ topic, sections, language: getLanguage() }),
     });
 
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
@@ -556,6 +556,7 @@ function expandToProse(id, title) {
     instruction: "Convert these bullet points and rough notes into flowing, formal academic prose suitable for a peer-reviewed journal review article. Preserve every piece of information provided, expand key points with appropriate context, add smooth transitions between ideas, and insert [Author et al., Year] citation placeholders where evidence is implied. Do not invent facts not present in the input.",
     pubmedContext,
     userContext,
+    language: getLanguage(),
   }, id, "✍ Expanded Prose", true, warn);
 }
 
@@ -777,6 +778,7 @@ function scheduleAutoSave() {
       sections: state.sections,
       library: state.library,
       customSections: SECTIONS.filter(s => s.isCustom),
+      language: getLanguage(),
     };
 
     // localStorage write-behind (sync, always)
@@ -827,6 +829,10 @@ function applyArticleData(data) {
   if (data.title) document.getElementById("article-title").value = data.title;
   if (data.authors) document.getElementById("authors").value = data.authors;
   if (data.keywords) document.getElementById("keywords").value = data.keywords;
+  if (data.language) {
+    const sel = document.getElementById("language-select");
+    if (sel) sel.value = data.language;
+  }
 
   // Restore previously saved custom sections
   if (data.customSections?.length) {
@@ -1295,6 +1301,7 @@ async function generateTable() {
         topic: getTopic(), sectionTitle,
         tableDescription: desc,
         pubmedContext: getSelectedPubmedContext(),
+        language: getLanguage(),
       }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
@@ -1366,6 +1373,7 @@ function refineSection(id, title) {
     topic: getTopic(), sectionTitle: title,
     currentDraft, instruction,
     pubmedContext: getSelectedPubmedContext(),
+    language: getLanguage(),
   }, id, "↺ Refined Draft", true);
 }
 

@@ -65,7 +65,7 @@ router.put("/:id", async (req, res) => {
       return res.status(403).json({ error: "Forbidden." });
     }
 
-    const { title, topic, authors, keywords, sections, library, customSections } = req.body;
+    const { title, topic, authors, keywords, sections, library, customSections, language } = req.body;
 
     if (title !== undefined)         article.title = title;
     if (topic !== undefined)         article.topic = topic;
@@ -74,6 +74,7 @@ router.put("/:id", async (req, res) => {
     if (sections !== undefined)      article.sections = sections;
     if (library !== undefined)       article.library = library;
     if (customSections !== undefined) article.customSections = customSections;
+    if (language !== undefined)      article.language = language;
 
     article.updatedAt = new Date();
     article.wordCount = article.computeWordCount();
