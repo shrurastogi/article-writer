@@ -92,6 +92,7 @@ function renderSections() {
           placeholder="${s.placeholder.replace(/"/g, '&quot;')}"
           oninput="updateSection('${s.id}', this.value)"
           style="margin-bottom:8px"
+          spellcheck="true"
         ></textarea>
         <input
           type="text"
@@ -99,6 +100,7 @@ function renderSections() {
           class="notes-input"
           placeholder="✏️ Notes / hints for AI generation (optional)"
           onclick="event.stopPropagation()"
+          spellcheck="true"
         />
         <div class="section-ai-actions">
           <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${titleEsc}')">✨ Generate Draft</button>
