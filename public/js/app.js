@@ -221,7 +221,7 @@ function updatePreview() {
 }
 
 // ── Streaming helper ──
-async function streamToAiBox(url, body, sectionId, label, canApply) {
+async function streamToAiBox(url, body, sectionId, label, canApply, warnNoRefs = false) {
   openSection(sectionId);
   const box = document.getElementById(`ai-${sectionId}`);
   const contentEl = document.getElementById(`ai-content-${sectionId}`);
@@ -230,7 +230,10 @@ async function streamToAiBox(url, body, sectionId, label, canApply) {
 
   box.classList.add("visible");
   labelEl.textContent = label;
-  contentEl.innerHTML = `<span class="ai-loading">✨ Generating...</span>`;
+  const warningHtml = warnNoRefs
+    ? `<div class="grounding-warning">⚠ No references selected — AI will generate without source grounding.</div>`
+    : "";
+  contentEl.innerHTML = `${warningHtml}<span class="ai-loading">✨ Generating...</span>`;
   actionsEl.style.display = canApply ? "" : "none";
 
   try {
@@ -242,13 +245,20 @@ async function streamToAiBox(url, body, sectionId, label, canApply) {
 
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
 
-    contentEl.textContent = "";
+    // Preserve grounding warning if present, then stream text after it
+    if (warnNoRefs) {
+      contentEl.innerHTML = `<div class="grounding-warning">⚠ No references selected — AI will generate without source grounding.</div>`;
+    } else {
+      contentEl.textContent = "";
+    }
+    const textNode = document.createTextNode("");
+    contentEl.appendChild(textNode);
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      contentEl.textContent += decoder.decode(value, { stream: true });
+      textNode.textContent += decoder.decode(value, { stream: true });
     }
     // Enable editing and show refine row after generation
     if (canApply) {
@@ -266,25 +276,53 @@ function getTopic() {
   return document.getElementById("medical-topic")?.value.trim() || "";
 }
 
+function isStrictMode() {
+  return document.getElementById("strict-mode-toggle")?.checked || false;
+}
+
+function hasSelectedRefs() {
+  return state.library.some(e => e.selected);
+}
+
+// Returns false and shows a toast/warning if context grounding check fails.
+// Returns true if the call should proceed (with optional inline warning).
+function checkContextGrounding(sectionId) {
+  if (isStrictMode() && !hasSelectedRefs()) {
+    showToast("Strict mode: select at least one reference first.", "error");
+    return false;
+  }
+  return true;
+}
+
+function onStrictModeChange() {
+  renderConfidenceBars();
+}
+
 function generateDraft(id, title) {
+  if (!checkContextGrounding(id)) return;
   const notes = document.getElementById(`notes-${id}`)?.value || "";
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext }, id, "✨ Generated Draft", true);
+  const warn = !hasSelectedRefs();
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
+  if (!checkContextGrounding(id)) return;
   const content = state.sections[id]?.prose;
   if (!content?.trim()) { showToast("Please write something in this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext }, id, "✨ Improved Text", true);
+  const warn = !hasSelectedRefs();
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext }, id, "✨ Improved Text", true, warn);
 }
 
 function getKeyPoints(id, title) {
+  if (!checkContextGrounding(id)) return;
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext }, id, "💡 Key Points to Cover", false);
+  const warn = !hasSelectedRefs();
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext }, id, "💡 Key Points to Cover", false, warn);
 }
 
 async function checkCoherence() {
@@ -412,17 +450,19 @@ function applyFlowRecommendation(sectionId, instruction) {
 }
 
 function expandToProse(id, title) {
+  if (!checkContextGrounding(id)) return;
   const prose = state.sections[id]?.prose || "";
   if (!prose.trim()) { showToast("Paste your bullet points or rough notes into this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
+  const warn = !hasSelectedRefs();
   streamToAiBox("/api/refine", {
     topic,
     sectionTitle: title,
     currentDraft: prose,
     instruction: "Convert these bullet points and rough notes into flowing, formal academic prose suitable for a peer-reviewed journal review article. Preserve every piece of information provided, expand key points with appropriate context, add smooth transitions between ideas, and insert [Author et al., Year] citation placeholders where evidence is implied. Do not invent facts not present in the input.",
     pubmedContext,
-  }, id, "✍ Expanded Prose", true);
+  }, id, "✍ Expanded Prose", true, warn);
 }
 
 function applyAiSuggestion(id) {
