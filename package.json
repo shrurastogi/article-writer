@@ -4,7 +4,7 @@
   "scripts": {
     "start": "NODE_ENV=production node server.js",
     "dev": "NODE_ENV=development node server.js",
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "git config core.hooksPath .githooks || true",
     "lint": "eslint src/**/*.js server.js",
     "test": "jest --runInBand",
     "test:unit": "jest tests/unit --runInBand",
