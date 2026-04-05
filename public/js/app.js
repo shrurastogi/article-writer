@@ -33,6 +33,7 @@ const refinementHistory = {};  // { [sectionId]: string[] }
 let tableModalSectionId = null;
 let dragSourceId = null;
 let autoSaveTimer = null;
+let lastVersionHash = null;
 const articleId = new URLSearchParams(window.location.search).get("id");
 const viewMode = new URLSearchParams(window.location.search).get("mode") === "view";
 
@@ -80,6 +81,9 @@ function adjustFontSize(delta) {
   renderSections();
   renderConfidenceBars();
   updatePreview();
+
+  // Auto-snapshot every 5 minutes if content changed
+  setInterval(autoSnapshot, 5 * 60 * 1000);
 
   // BUG-003: delegated listener for "Apply to Section" buttons in coherence output
   document.getElementById("coherence-output")?.addEventListener("click", e => {
@@ -857,6 +861,115 @@ function scheduleAutoSave() {
       }
     }
   }, 1500);
+}
+
+// ── Article Versioning ────────────────────────────────────────────────────────
+
+function hashSections() {
+  try { return btoa(JSON.stringify(state.sections)).slice(0, 32); }
+  catch { return ""; }
+}
+
+async function autoSnapshot() {
+  if (!articleId || viewMode) return;
+  const hash = hashSections();
+  if (!hash || hash === lastVersionHash) return;
+  try {
+    await fetch(`/api/articles/${articleId}/versions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: "Auto" }),
+    });
+    lastVersionHash = hash;
+  } catch { /* silent — auto-save failures don't alert user */ }
+}
+
+async function saveVersionManual() {
+  if (!articleId) { showToast("Save the article first.", "error"); return; }
+  const label = prompt("Version label (optional):", "") ?? "";
+  try {
+    const res = await fetch(`/api/articles/${articleId}/versions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    });
+    if (!res.ok) throw new Error("Failed");
+    lastVersionHash = hashSections();
+    showToast("Version saved.", "success");
+  } catch {
+    showToast("Failed to save version.", "error");
+  }
+}
+
+async function openVersionHistory() {
+  if (!articleId) { showToast("No article loaded.", "error"); return; }
+  try {
+    const res = await fetch(`/api/articles/${articleId}/versions`);
+    if (!res.ok) throw new Error("Failed");
+    const { versions } = await res.json();
+    renderVersionHistoryPanel(versions);
+    document.getElementById("version-history-panel")?.classList.add("open");
+  } catch {
+    showToast("Failed to load version history.", "error");
+  }
+}
+
+function closeVersionHistory() {
+  document.getElementById("version-history-panel")?.classList.remove("open");
+}
+
+function renderVersionHistoryPanel(versions) {
+  const panel = document.getElementById("version-history-panel");
+  if (!panel) return;
+  const list = versions.map(v => {
+    const date = new Date(v.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return `<div class="version-row">
+      <div>
+        <div class="version-label">${escapeHtml(v.label || "Auto")}</div>
+        <div class="version-meta">${date} · ${(v.wordCount || 0).toLocaleString()} words</div>
+      </div>
+      <div class="version-actions">
+        <button class="btn btn-sm" onclick="restoreVersion('${v._id}')">Restore</button>
+        <button class="btn btn-sm btn-outline" onclick="deleteVersion('${v._id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <strong style="font-size:0.95rem">Version History</strong>
+      <button class="btn btn-sm btn-outline" onclick="closeVersionHistory()">✕</button>
+    </div>
+    ${versions.length ? list : '<p style="color:var(--secondary);font-size:0.82rem">No versions saved yet.</p>'}`;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function restoreVersion(vid) {
+  if (!confirm("Restore this version? The current content will be saved as a new version first.")) return;
+  try {
+    const res = await fetch(`/api/articles/${articleId}/versions/${vid}/restore`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed");
+    closeVersionHistory();
+    await loadArticle();
+    renderSections();
+    updatePreview();
+    showToast("Version restored.", "success");
+  } catch {
+    showToast("Failed to restore version.", "error");
+  }
+}
+
+async function deleteVersion(vid) {
+  if (!confirm("Delete this version? This cannot be undone.")) return;
+  try {
+    await fetch(`/api/articles/${articleId}/versions/${vid}`, { method: "DELETE" });
+    await openVersionHistory(); // re-render list
+  } catch {
+    showToast("Failed to delete version.", "error");
+  }
 }
 
 // ── Load article (server-primary, localStorage fallback) ──

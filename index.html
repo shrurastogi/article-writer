@@ -26,6 +26,8 @@
       <button class="btn-font-zoom" onclick="adjustFontSize(0)" title="Reset font size">↺</button>
       <button class="btn-font-zoom" onclick="adjustFontSize(1)" title="Increase font size">A+</button>
     </div>
+    <button class="btn-theme-toggle" onclick="saveVersionManual()" title="Save version snapshot" style="font-size:0.8rem">📌 Save Version</button>
+    <button class="btn-theme-toggle" onclick="openVersionHistory()" title="Version history" style="font-size:0.8rem">🕐 History</button>
     <button id="theme-toggle" class="btn-theme-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
     <div class="user-widget" id="user-widget">
       <span id="user-avatar-wrap"></span>
@@ -219,6 +221,8 @@
     <div id="table-gen-status" style="margin-top:8px;font-size:0.82rem;color:var(--ai);font-style:italic;display:none">Generating table...</div>
   </div>
 </div>
+
+<div id="version-history-panel" class="version-history-panel"></div>
 
 <script src="/js/app.js"></script>
 </body>
