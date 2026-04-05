@@ -263,3 +263,9 @@
     .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
     .suggestion-chip { background: var(--ai-light); border: 1px solid var(--ai-border); color: var(--ai); border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
     .suggestion-chip:hover { background: var(--ai); color: #fff; }
+
+    /* ── AI Confidence Indicator ── */
+    .confidence-bar { font-size: 0.73rem; padding: 3px 8px; border-radius: 10px; margin-top: 6px; display: inline-block; cursor: default; }
+    .conf-red    { background: #fee2e2; color: #dc2626; }
+    .conf-yellow { background: #fef9c3; color: #b45309; }
+    .conf-green  { background: #dcfce7; color: #16a34a; }
