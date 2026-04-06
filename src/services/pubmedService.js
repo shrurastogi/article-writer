@@ -1,7 +1,5 @@
 "use strict";
 
-const https = require("https");
-const net = require("net");
 const tls = require("tls");
 const dnsPromises = require("dns").promises;
 
