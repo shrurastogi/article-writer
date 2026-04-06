@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shared Article — Medical Article Writer</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    body { max-width: 860px; margin: 0 auto; padding: 32px 24px; font-family: inherit; }
+    .share-header { border-bottom: 2px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    .share-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 4px; color: var(--text); }
+    .share-meta { font-size: 0.85rem; color: var(--secondary); }
+    .share-section { margin-bottom: 28px; }
+    .share-section-title { font-weight: 700; font-size: 1rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 10px; }
+    .share-section-prose { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.7; color: var(--text); }
+    .share-badge { display: inline-block; background: var(--primary-light, #fff3e6); color: var(--primary); border-radius: 20px; padding: 2px 10px; font-size: 0.75rem; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+    .share-error { background: #fee2e2; color: #dc2626; border-radius: 8px; padding: 16px; margin-top: 40px; text-align: center; }
+    .share-loading { text-align: center; padding: 60px 0; color: var(--secondary); }
+  </style>
+</head>
+<body>
+  <div id="share-root"><div class="share-loading">Loading shared article…</div></div>
+
+  <script>
+    (async () => {
+      const token = location.pathname.split("/share/")[1];
+      if (!token) {
+        document.getElementById("share-root").innerHTML = '<div class="share-error">Invalid share link.</div>';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/share/${token}`);
+        if (!res.ok) throw new Error("Not found");
+        const data = await res.json();
+        renderArticle(data);
+      } catch {
+        document.getElementById("share-root").innerHTML = '<div class="share-error">This share link is invalid or has been revoked.</div>';
+      }
+    })();
+
+    function escHtml(str) {
+      return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function renderArticle(data) {
+      const sections = data.sections || {};
+      let sectionsHtml = "";
+      for (const [id, val] of Object.entries(sections)) {
+        const prose = typeof val === "string" ? val : (val?.prose || "");
+        if (!prose.trim()) continue;
+        const title = id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        sectionsHtml += `<div class="share-section">
+          <div class="share-section-title">${escHtml(title)}</div>
+          <div class="share-section-prose">${escHtml(prose)}</div>
+        </div>`;
+      }
+
+      document.getElementById("share-root").innerHTML = `
+        <div class="share-header">
+          <h1 class="share-title">${escHtml(data.title || "Untitled Article")}<span class="share-badge">Read-only</span></h1>
+          <div class="share-meta">
+            ${data.topic ? `<span><strong>Topic:</strong> ${escHtml(data.topic)}</span> &nbsp;·&nbsp; ` : ""}
+            ${data.authors ? `<span><strong>Authors:</strong> ${escHtml(data.authors)}</span> &nbsp;·&nbsp; ` : ""}
+            ${data.wordCount ? `<span>${data.wordCount.toLocaleString()} words</span> &nbsp;·&nbsp; ` : ""}
+            <span>${escHtml(data.language || "English")}</span>
+          </div>
+        </div>
+        ${sectionsHtml || '<p style="color:var(--secondary)">No content in this article.</p>'}`;
+      document.title = `${data.title || "Shared Article"} — Medical Article Writer`;
+    }
+  </script>
+</body>
+</html>

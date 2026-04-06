@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 const logger = require("./utils/logger");
 const { requireAuth } = require("./middleware/auth");
 const aiRateLimit = require("./middleware/rateLimit");
+const Article = require("./models/Article");
 require("./lib/passport-config");
 
 const app = express();
@@ -41,6 +42,30 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// ── Public share page (no auth required) ─────────────────────────────────────
+app.get("/share/:token", (req, res) => {
+  res.sendFile(path.join(__dirname, "../share.html"));
+});
+
+// ── Public share API (no auth required) ──────────────────────────────────────
+app.get("/api/share/:token", async (req, res) => {
+  try {
+    const article = await Article.findOne({ shareToken: req.params.token });
+    if (!article) return res.status(404).json({ error: "Not found." });
+    res.json({
+      title: article.title,
+      topic: article.topic,
+      sections: article.sections,
+      authors: article.authors,
+      wordCount: article.wordCount,
+      language: article.language,
+    });
+  } catch (err) {
+    logger.error({ msg: "Public share fetch error", error: err.message });
+    res.status(500).json({ error: "Failed to fetch shared article." });
+  }
+});
 
 // ── Page routes (auth-guarded) ────────────────────────────────────────────────
 app.get("/", requireAuth, (req, res) => {

@@ -972,6 +972,117 @@ async function deleteVersion(vid) {
   }
 }
 
+// ── Article Sharing ───────────────────────────────────────────────────────────
+
+async function openShareModal() {
+  if (!articleId) { showToast("Save the article first.", "error"); return; }
+  document.getElementById("share-link-display").style.display = "none";
+  document.getElementById("share-link-empty").style.display = "block";
+  document.getElementById("generate-share-btn").style.display = "";
+  document.getElementById("share-modal").style.display = "flex";
+  document.getElementById("collaborators-list").innerHTML = "";
+  try {
+    const res = await fetch(`/api/articles/${articleId}`);
+    if (res.ok) {
+      const { article } = await res.json();
+      if (article.shareToken) showShareLink(article.shareToken);
+      if (article.collaborators?.length) renderCollaborators(article.collaborators);
+    }
+  } catch { /* ignore */ }
+}
+
+function closeShareModal() {
+  document.getElementById("share-modal").style.display = "none";
+}
+
+function showShareLink(token) {
+  const url = `${location.origin}/share/${token}`;
+  document.getElementById("share-link-input").value = url;
+  document.getElementById("share-link-display").style.display = "block";
+  document.getElementById("share-link-empty").style.display = "none";
+  document.getElementById("generate-share-btn").style.display = "none";
+}
+
+async function generateShareLink() {
+  try {
+    const res = await fetch(`/api/articles/${articleId}/share`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed");
+    const { shareToken } = await res.json();
+    showShareLink(shareToken);
+    showToast("Share link generated!", "success");
+  } catch {
+    showToast("Failed to generate share link.", "error");
+  }
+}
+
+function copyShareLink() {
+  const input = document.getElementById("share-link-input");
+  navigator.clipboard?.writeText(input.value)
+    .then(() => showToast("Copied!", "success"))
+    .catch(() => { input.select(); document.execCommand("copy"); showToast("Copied!", "success"); });
+}
+
+async function revokeShareLink() {
+  if (!confirm("Revoke share link? Anyone with the current link will lose access.")) return;
+  try {
+    const res = await fetch(`/api/articles/${articleId}/share`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed");
+    document.getElementById("share-link-display").style.display = "none";
+    document.getElementById("share-link-empty").style.display = "block";
+    document.getElementById("generate-share-btn").style.display = "";
+    showToast("Share link revoked.", "success");
+  } catch {
+    showToast("Failed to revoke share link.", "error");
+  }
+}
+
+async function addCollaborator() {
+  const email = document.getElementById("collab-email").value.trim();
+  const role = document.getElementById("collab-role").value;
+  if (!email) { showToast("Enter an email address.", "error"); return; }
+  try {
+    const res = await fetch(`/api/articles/${articleId}/collaborators`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, role }),
+    });
+    if (!res.ok) {
+      const body = await res.json();
+      showToast(body.error || "Failed to add collaborator.", "error");
+      return;
+    }
+    const { collaborators } = await res.json();
+    renderCollaborators(collaborators);
+    document.getElementById("collab-email").value = "";
+    showToast("Collaborator added.", "success");
+  } catch {
+    showToast("Failed to add collaborator.", "error");
+  }
+}
+
+function renderCollaborators(collaborators) {
+  const list = document.getElementById("collaborators-list");
+  if (!collaborators?.length) { list.innerHTML = ""; return; }
+  list.innerHTML = collaborators.map(c =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span>${c.role}</span>
+      <button class="btn btn-sm btn-outline" onclick="removeCollaborator('${c._userId}')">Remove</button>
+    </div>`
+  ).join("");
+}
+
+async function removeCollaborator(uid) {
+  try {
+    const res = await fetch(`/api/articles/${articleId}/collaborators/${uid}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed");
+    const { collaborators } = await res.json();
+    renderCollaborators(collaborators);
+    showToast("Collaborator removed.", "success");
+  } catch {
+    showToast("Failed to remove collaborator.", "error");
+  }
+}
+
 // ── Load article (server-primary, localStorage fallback) ──
 async function loadArticle() {
   if (articleId) {
