@@ -26,6 +26,7 @@ const LEGACY_TITLES = {
 const state = {
   sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [] }])),
   library: [],  // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, refNumber, selected }]
+  writingStyle: null, // { sampleText, styleProfile, calibratedAt } — set in PR 5
 };
 
 const refinementHistory = {};  // { [sectionId]: string[] }
@@ -33,6 +34,7 @@ let tableModalSectionId = null;
 let dragSourceId = null;
 let autoSaveTimer = null;
 const articleId = new URLSearchParams(window.location.search).get("id");
+const viewMode = new URLSearchParams(window.location.search).get("mode") === "view";
 
 // ── Dark mode ──
 function applyTheme() {
@@ -809,7 +811,22 @@ async function signOut() {
 }
 
 // ── Auto-save (localStorage write-behind + server primary) ──
+// Stub — full implementation in PR 5 (writing style calibration)
+function renderStyleCard(writingStyle) { /* expanded in sprint6-writing-style */ }
+
+function applyViewMode() {
+  if (!viewMode) return;
+  document.querySelectorAll("textarea, input, select").forEach(el => el.disabled = true);
+  document.querySelectorAll("button.ai-btn, button.section-action-btn, #full-draft-btn, #run-flow-check").forEach(el => el.disabled = true);
+  const banner = document.createElement("div");
+  banner.className = "view-mode-banner";
+  banner.textContent = "View-only mode — this article is locked";
+  const headerRight = document.querySelector(".header-right");
+  if (headerRight) headerRight.prepend(banner);
+}
+
 function scheduleAutoSave() {
+  if (viewMode) return;
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(async () => {
     const payload = {
@@ -917,9 +934,14 @@ function applyArticleData(data) {
     state.library = data.library;
     renderLibrary();
   }
+  if (data.writingStyle?.styleProfile) {
+    state.writingStyle = data.writingStyle;
+    renderStyleCard(data.writingStyle);
+  }
   renumberSections();
   SECTIONS.forEach(s => updateWordCount(s.id));
   updateTotalWordCount();
+  applyViewMode();
 }
 
 // ── Clear all ──

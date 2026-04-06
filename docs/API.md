@@ -156,6 +156,63 @@ Deep-copy an article owned by the authenticated user. The clone gets `"Copy of â
 
 ---
 
+### POST /api/articles/:id/lock
+Lock an article (owner only). Locked articles return `423 Locked` on PUT attempts.
+
+**Response:** `200 OK` `{ "isLocked": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/unlock
+Unlock a previously locked article (owner only).
+
+**Response:** `200 OK` `{ "isLocked": false }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/share
+Generate a public share token for the article (idempotent â€” returns existing token if already set).
+
+**Response:** `200 OK` `{ "shareToken": "uuid", "url": "/share/uuid" }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### DELETE /api/articles/:id/share
+Revoke the public share token.
+
+**Response:** `200 OK` `{ "revoked": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/collaborators
+Invite a registered user as a collaborator.
+
+**Body:** `{ "email": "user@example.com", "role": "viewer" | "editor" }`  
+**Response:** `200 OK` `{ "collaborators": [...] }`  
+**Errors:** `400 BAD_REQUEST`; `404 NOT_FOUND` (article or user).
+
+---
+
+### DELETE /api/articles/:id/collaborators/:uid
+Remove a collaborator by their user ID.
+
+**Response:** `200 OK` `{ "collaborators": [...] }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### GET /api/share/:token
+Public endpoint (no auth). Returns article data for read-only preview.
+
+**Response:** `200 OK` `{ "title", "topic", "sections", "authors", "wordCount", "language" }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
 ## Utility
 
 ### GET /api/version

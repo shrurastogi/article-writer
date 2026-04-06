@@ -227,3 +227,42 @@ describe("POST /api/articles/:id/clone", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ── POST /api/articles/:id/lock & /unlock ─────────────────────────────────────
+
+describe("POST /api/articles/:id/lock and /unlock", () => {
+  it("locks an article, then PUT returns 423", async () => {
+    const agent = await authenticatedAgent("lock-user@example.com");
+    const create = await agent.post("/api/articles");
+    const id = create.body.article._id;
+
+    const lockRes = await agent.post(`/api/articles/${id}/lock`);
+    expect(lockRes.status).toBe(200);
+    expect(lockRes.body.isLocked).toBe(true);
+
+    const putRes = await agent.put(`/api/articles/${id}`).send({ title: "Try to edit" });
+    expect(putRes.status).toBe(423);
+  });
+
+  it("unlock allows editing again", async () => {
+    const agent = await authenticatedAgent("unlock-user@example.com");
+    const create = await agent.post("/api/articles");
+    const id = create.body.article._id;
+
+    await agent.post(`/api/articles/${id}/lock`);
+    const unlockRes = await agent.post(`/api/articles/${id}/unlock`);
+    expect(unlockRes.status).toBe(200);
+    expect(unlockRes.body.isLocked).toBe(false);
+
+    const putRes = await agent.put(`/api/articles/${id}`).send({ title: "Now editable" });
+    expect(putRes.status).toBe(200);
+  });
+
+  it("returns 404 when locking another user's article", async () => {
+    const agent1 = await authenticatedAgent("lock-owner@example.com");
+    const agent2 = await authenticatedAgent("lock-other@example.com");
+    const create = await agent1.post("/api/articles");
+    const res = await agent2.post(`/api/articles/${create.body.article._id}/lock`);
+    expect(res.status).toBe(404);
+  });
+});
