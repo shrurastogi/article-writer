@@ -202,12 +202,8 @@ function renderSections() {
           ></textarea>
         </div>
         <div class="section-ai-actions">
-          <button class="btn btn-ai btn-sm" onclick="generateDraft('${s.id}','${titleEsc}')">✨ Generate Draft</button>
-          <button class="btn btn-ai btn-sm" onclick="improveSection('${s.id}','${titleEsc}')">✨ Improve</button>
-          <button class="btn btn-outline btn-sm" onclick="expandToProse('${s.id}','${titleEsc}')">✍ Expand to Prose</button>
-          <button class="btn btn-outline btn-sm" onclick="getKeyPoints('${s.id}','${titleEsc}')">💡 Key Points</button>
-          <button class="btn btn-outline btn-sm" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
-          <button class="btn btn-outline btn-sm" onclick="runGrammarCheck('${s.id}','${titleEsc}')">📝 Grammar</button>
+          <button class="btn btn-ai btn-sm section-action-btn" onclick="smartWrite('${s.id}','${titleEsc}')">✨ Write</button>
+          <button class="btn btn-outline btn-sm section-action-btn" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
           <div class="confidence-bar" id="conf-${s.id}"></div>
         </div>
         <div class="grammar-panel" id="grammar-${s.id}" style="display:none">
@@ -433,6 +429,23 @@ function checkContextGrounding(sectionId) {
 
 function onStrictModeChange() {
   renderConfidenceBars();
+}
+
+// ── Smart Write — auto-detects section state and calls the right endpoint ──
+function detectWriteMode(id) {
+  const prose = state.sections[id]?.prose?.trim() || "";
+  if (!prose) return "generate";
+  const lines = prose.split("\n").filter(l => l.trim());
+  const bulletLines = lines.filter(l => /^[-•*]|\d+\./.test(l.trim()));
+  if (lines.length > 0 && bulletLines.length / lines.length > 0.4) return "expand";
+  return "improve";
+}
+
+function smartWrite(id, title) {
+  const mode = detectWriteMode(id);
+  if (mode === "generate") generateDraft(id, title);
+  else if (mode === "expand") expandToProse(id, title);
+  else improveSection(id, title);
 }
 
 function generateDraft(id, title) {
