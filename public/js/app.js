@@ -164,8 +164,9 @@ function renderSections() {
           ${s.num ? `<span class="section-num">${s.num}.</span>` : ""}
           <span class="section-name">${s.title}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div class="section-head-right">
           <span class="section-wc" id="wc-${s.id}">0 words</span>
+          <button class="btn-grammar-icon" title="Grammar & Style Check" onclick="runGrammarCheck('${s.id}','${titleEsc}');event.stopPropagation()">📝</button>
           ${s.isCustom ? `<button class="btn-icon" title="Rename" onclick="event.stopPropagation();renameSection('${s.id}')">✎</button>` : ""}
           <button class="btn-icon" title="Delete section" onclick="event.stopPropagation();deleteSection('${s.id}')">✕</button>
         </div>
