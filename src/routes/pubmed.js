@@ -20,7 +20,7 @@ router.post("/pubmed-search", async (req, res) => {
       `&term=${encodeURIComponent(query.trim())}` +
       `&retmax=${maxResults}&sort=relevance&retmode=json${keyParam}`;
 
-    const searchResp = await fetch(searchUrl);
+    const searchResp = await fetchWithRetry(searchUrl);
     if (!searchResp.ok) throw new Error(`PubMed search HTTP ${searchResp.status}`);
     const searchData = await searchResp.json();
     const ids = searchData.esearchresult?.idlist || [];
@@ -33,7 +33,7 @@ router.post("/pubmed-search", async (req, res) => {
       `${NCBI_BASE}/efetch.fcgi?db=pubmed` +
       `&id=${ids.join(",")}&rettype=abstract&retmode=xml${keyParam}`;
 
-    const fetchResp = await fetch(fetchUrl);
+    const fetchResp = await fetchWithRetry(fetchUrl);
     if (!fetchResp.ok) throw new Error(`PubMed fetch HTTP ${fetchResp.status}`);
     const xml = await fetchResp.text();
 
