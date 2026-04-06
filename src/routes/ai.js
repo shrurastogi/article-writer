@@ -2,12 +2,14 @@
 
 const router = require("express").Router();
 const { getClient, MODEL } = require("../services/llmService");
-const { getSectionContext } = require("../services/sectionContext");
+const { getSectionContext, getStyleInstruction } = require("../services/sectionContext");
+const Article = require("../models/Article");
+const { requireApiAuth } = require("../middleware/auth");
 const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -25,6 +27,7 @@ router.post("/generate", async (req, res) => {
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
+  const styleText = getStyleInstruction(writingStyle);
 
   const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
@@ -33,7 +36,7 @@ Requirements:
 - Evidence-based with citations as [Author et al., Year] placeholders
 - Comprehensive yet concise (300–600 words for most sections)
 - Include key statistics, landmark trial names, drug names, and current guidelines where applicable
-- Return ONLY the section content — no section heading, no preamble, no explanations${notesText}${litText}${userContextText}`;
+- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -59,7 +62,7 @@ Requirements:
 
 // Improve existing section text
 router.post("/improve", async (req, res) => {
-  const { topic, sectionTitle, content, pubmedContext, userContext, language } = req.body;
+  const { topic, sectionTitle, content, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -78,6 +81,7 @@ router.post("/improve", async (req, res) => {
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
+  const styleText = getStyleInstruction(writingStyle);
 
   const prompt = `${languagePrefix}You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
 
@@ -86,7 +90,7 @@ Make it:
 - Better structured with clear logical flow and transitions
 - Consistent with standard ${subject} terminology and nomenclature
 - More concise where appropriate without losing key content
-- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)
+- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)${styleText ? `\n- ${styleText}` : ""}
 
 Return ONLY the improved text — no explanations, no heading.${litText}${userContextText}
 
@@ -117,7 +121,7 @@ ${content}`;
 
 // Suggest key points to cover in a section
 router.post("/keypoints", async (req, res) => {
-  const { topic, sectionId, sectionTitle, pubmedContext, userContext, language } = req.body;
+  const { topic, sectionId, sectionTitle, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -134,8 +138,9 @@ router.post("/keypoints", async (req, res) => {
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
+  const styleText = getStyleInstruction(writingStyle);
 
-  const prompt = `${languagePrefix}You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.
+  const prompt = `${languagePrefix}You are a domain expert in ${subject}. List the essential key points, topics, and recent developments that must be covered in ${context}.${styleText ? ` ${styleText}` : ""}
 
 Include:
 - Critical concepts and mechanisms
@@ -231,7 +236,7 @@ Example structure:
 
 // Refine an existing draft section with a user instruction
 router.post("/refine", async (req, res) => {
-  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language } = req.body;
+  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -252,11 +257,12 @@ router.post("/refine", async (req, res) => {
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
+  const styleText = getStyleInstruction(writingStyle);
 
   const prompt = `${languagePrefix}You are an expert medical writer specializing in ${topic}.
 The user has a draft of the "${sectionTitle}" section and wants to refine it with the following instruction:
 
-Instruction: ${instruction}
+Instruction: ${instruction}${styleText ? `\n${styleText}` : ""}
 
 Current draft:
 ${currentDraft}${litText}${userContextText}
@@ -404,6 +410,51 @@ Rules:
   }
 });
 
+// Calibrate writing style from a sample text
+router.post("/articles/:id/calibrate-style", requireApiAuth, async (req, res) => {
+  const { sampleText } = req.body;
+  if (!sampleText || sampleText.trim().length < 100) {
+    return res.status(400).json({ error: "Sample must be at least 100 characters." });
+  }
+
+  const article = await Article.findOne({ _id: req.params.id, _userId: req.user._id });
+  if (!article) return res.status(404).json({ error: "Not found." });
+
+  const prompt = `Analyze the writing style of the following text and return a JSON object with these exact keys:
+avgSentenceLength (number, average words per sentence),
+activeVoicePercent (number 0-100),
+formalityScore (number 0-100, where 100 is very formal),
+hedgingFrequency ("low" | "medium" | "high"),
+citationDensity ("low" | "medium" | "high"),
+toneDescriptor (string, max 20 chars, e.g. "authoritative", "cautious", "clinical").
+Return ONLY valid JSON — no markdown, no code fences, no explanation.
+Text:
+"""${sampleText.trim().slice(0, 3000)}"""`;
+
+  try {
+    const completion = await getClient().chat.completions.create({
+      model: MODEL,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+    });
+    const raw = completion.choices[0].message.content.trim();
+    let styleProfile;
+    try { styleProfile = JSON.parse(raw); }
+    catch {
+      logger.error({ msg: "Style profile JSON parse error", raw: raw.slice(0, 200) });
+      return res.status(500).json({ error: "Could not parse style profile from AI response." });
+    }
+
+    article.writingStyle = { sampleText: sampleText.trim().slice(0, 1000), styleProfile, calibratedAt: new Date() };
+    article.markModified("writingStyle");
+    await article.save();
+    res.json({ writingStyle: article.writingStyle });
+  } catch (err) {
+    logger.error({ msg: "Calibrate style error", error: err.message });
+    res.status(500).json({ error: "Failed to calibrate style: " + err.message });
+  }
+});
+
 // Suggest relevant section names for a review article
 router.post("/suggest-sections", async (req, res) => {
   const { topic, existingSections } = req.body;
@@ -444,7 +495,7 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 
 // One-click full article draft — SSE endpoint
 router.post("/agent/draft", async (req, res) => {
-  const { topic, sections, language, pubmedContext } = req.body;
+  const { topic, sections, language, pubmedContext, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -469,6 +520,8 @@ router.post("/agent/draft", async (req, res) => {
     ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
     : "";
 
+  const styleText = getStyleInstruction(writingStyle);
+
   try {
     for (const section of sections) {
       const { id, title, notes, userContext } = section;
@@ -486,7 +539,7 @@ Requirements:
 - Formal academic writing style suitable for a high-impact journal
 - Evidence-based with citations as [Author et al., Year] placeholders
 - Comprehensive yet concise (300–600 words for most sections)
-- Return ONLY the section content — no section heading, no preamble, no explanations${notesText}${litText}${userContextText}`;
+- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
 
       const stream = await getClient().chat.completions.create({
         model: MODEL,
