@@ -78,6 +78,9 @@ app.get("/login", (req, res) => {
   if (req.isAuthenticated()) return res.redirect("/dashboard");
   res.sendFile(path.join(__dirname, "../login.html"));
 });
+app.get("/settings", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "../settings.html"));
+});
 
 app.use(express.static(path.join(__dirname, "../public")));
 app.use(express.static(path.join(__dirname, ".."), { index: false }));
@@ -89,6 +92,7 @@ app.use("/api/articles/:id/versions", require("./routes/versions"));
 app.use("/api", aiRateLimit, require("./routes/ai"));
 app.use("/api", require("./routes/pubmed"));
 app.use("/api", require("./routes/export"));
+app.use("/api", require("./routes/settings"));
 
 app.get("/api/version", (req, res) => {
   res.json({
