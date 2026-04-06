@@ -360,3 +360,9 @@
     .style-metric { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 6px 10px; min-width: 100px; }
     .style-metric-label { display: block; font-size: 0.72rem; color: var(--muted); }
     .style-metric-value { display: block; font-size: 0.85rem; font-weight: 600; color: #5b21b6; margin-top: 2px; }
+
+    /* ── Notes label row + Suggest outline link ── */
+    .notes-label-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+    .notes-label { font-size:0.78rem; color:var(--muted); font-weight:500; }
+    .suggest-outline-link { font-size:0.75rem; color:var(--ai); cursor:pointer; text-decoration:none; user-select:none; }
+    .suggest-outline-link:hover { text-decoration:underline; }

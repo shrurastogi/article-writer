@@ -179,11 +179,15 @@ function renderSections() {
           style="margin-bottom:8px"
           spellcheck="true"
         ></textarea>
+        <div class="notes-label-row">
+          <span class="notes-label">Focus / angle for AI</span>
+          <a class="suggest-outline-link" onclick="suggestOutline('${s.id}','${titleEsc}');event.stopPropagation()">💡 Suggest what to cover</a>
+        </div>
         <input
           type="text"
           id="notes-${s.id}"
           class="notes-input"
-          placeholder="✏️ Notes / hints for AI generation (optional)"
+          placeholder="e.g. 'emphasise RCT data and hazard ratios', 'focus on paediatric dosing'"
           onclick="event.stopPropagation()"
           spellcheck="true"
         />
@@ -476,6 +480,42 @@ function getKeyPoints(id, title) {
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
   streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "💡 Key Points to Cover", false, warn);
+}
+
+async function suggestOutline(id, title) {
+  const notesEl = document.getElementById(`notes-${id}`);
+  if (!notesEl) return;
+  const link = document.querySelector(`.suggest-outline-link[onclick*="suggestOutline('${id}'"]`);
+  if (link) { link.textContent = "Loading…"; link.style.pointerEvents = "none"; }
+  try {
+    const resp = await fetch("/api/keypoints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: getTopic(), sectionId: id, sectionTitle: title,
+        pubmedContext: getSelectedPubmedContext(),
+        userContext: state.sections[id]?.userContext || "",
+        language: getLanguage(),
+        writingStyle: state.writingStyle,
+      }),
+    });
+    if (!resp.ok) throw new Error();
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    notesEl.value = text.trim();
+    notesEl.dispatchEvent(new Event("input"));
+    showToast("Outline added to notes — edit it, then click Write.", "success");
+  } catch {
+    showToast("Could not suggest outline. Please try again.", "error");
+  } finally {
+    if (link) { link.textContent = "💡 Suggest what to cover"; link.style.pointerEvents = ""; }
+  }
 }
 
 async function checkCoherence() {
