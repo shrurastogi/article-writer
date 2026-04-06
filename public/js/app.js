@@ -192,8 +192,8 @@ function renderSections() {
           onclick="event.stopPropagation()"
           spellcheck="true"
         />
-        <div class="user-ctx-toggle" onclick="toggleUserCtx('${s.id}');event.stopPropagation()">
-          <span class="user-ctx-hint">+ Add Your Data</span>
+        <div class="user-ctx-toggle" title="Paste raw numbers, trial results, or patient data. AI treats this as fact." onclick="toggleUserCtx('${s.id}');event.stopPropagation()">
+          <span class="user-ctx-hint">+ Add your own data / statistics</span>
           <span class="user-ctx-chevron" id="user-ctx-chevron-${s.id}">▶</span>
         </div>
         <div class="user-ctx-body" id="user-ctx-body-${s.id}" style="display:none">
