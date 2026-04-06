@@ -366,3 +366,8 @@
     .notes-label { font-size:0.78rem; color:var(--muted); font-weight:500; }
     .suggest-outline-link { font-size:0.75rem; color:var(--ai); cursor:pointer; text-decoration:none; user-select:none; }
     .suggest-outline-link:hover { text-decoration:underline; }
+
+    /* ── Grammar icon in section header ── */
+    .section-head-right { display:flex; align-items:center; gap:6px; }
+    .btn-grammar-icon { background:none; border:none; cursor:pointer; font-size:0.9rem; opacity:0.45; transition:opacity 0.15s; padding:2px 4px; border-radius:4px; line-height:1; }
+    .btn-grammar-icon:hover { opacity:1; background:var(--bg); }
