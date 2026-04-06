@@ -213,6 +213,40 @@ Public endpoint (no auth). Returns article data for read-only preview.
 
 ---
 
+## Article Versioning
+
+### GET /api/articles/:id/versions
+List saved versions for an article (no snapshot content — metadata only).
+
+**Response:** `200 OK` `{ "versions": [{ "_id", "label", "wordCount", "createdAt" }, ...] }`  
+**Errors:** `401 UNAUTHORIZED`.
+
+---
+
+### POST /api/articles/:id/versions
+Create a snapshot of the article's current sections. Oldest versions deleted when cap of 50 is exceeded.
+
+**Body:** `{ "label": "string (optional)" }`  
+**Response:** `201 Created` `{ "version": { "_id", "label", "wordCount", "createdAt" } }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/versions/:vid/restore
+Restore a version. Saves current state as a new "Before restore" version first.
+
+**Response:** `200 OK` `{ "restored": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### DELETE /api/articles/:id/versions/:vid
+Delete a version.
+
+**Response:** `200 OK` `{ "deleted": true }`
+
+---
+
 ## Utility
 
 ### GET /api/version

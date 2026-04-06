@@ -344,3 +344,11 @@
 
     /* ── View-only Mode Banner ── */
     .view-mode-banner { background: var(--warning-bg, #fffbeb); border-bottom: 1px solid #fcd34d; color: #92400e; padding: 6px 16px; font-size: 0.8rem; font-weight: 500; border-radius: 6px; margin-right: 8px; }
+
+    /* ── Version History Panel ── */
+    .version-history-panel { position: fixed; right: 0; top: 0; height: 100vh; width: 320px; background: var(--surface); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; z-index: 200; transform: translateX(100%); transition: transform 0.2s ease; }
+    .version-history-panel.open { transform: translateX(0); }
+    .version-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 8px; }
+    .version-label { font-weight: 500; font-size: 0.85rem; color: var(--text); }
+    .version-meta { font-size: 0.73rem; color: var(--secondary); margin-top: 2px; }
+    .version-actions { display: flex; gap: 4px; flex-shrink: 0; }

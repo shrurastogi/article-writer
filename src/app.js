@@ -60,6 +60,7 @@ app.use(express.static(path.join(__dirname, ".."), { index: false }));
 // ── API routers ───────────────────────────────────────────────────────────────
 app.use("/auth", require("./routes/auth"));
 app.use("/api/articles", require("./routes/articles"));
+app.use("/api/articles/:id/versions", require("./routes/versions"));
 app.use("/api", aiRateLimit, require("./routes/ai"));
 app.use("/api", require("./routes/pubmed"));
 app.use("/api", require("./routes/export"));
