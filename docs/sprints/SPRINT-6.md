@@ -1,7 +1,7 @@
 # Sprint 6 — Collaboration, Versioning & Full Settings
 
-**Status:** Planned  
-**Dates:** TBD  
+**Status:** Complete ✅  
+**Dates:** Completed 2026-04-06  
 **Priority tier:** Medium  
 **Renumbered from:** Sprint 4 (was SPRINT-4.md)
 
