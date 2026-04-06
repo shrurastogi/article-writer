@@ -26,7 +26,7 @@ const LEGACY_TITLES = {
 const state = {
   sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [] }])),
   library: [],  // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, refNumber, selected }]
-  writingStyle: null, // { sampleText, styleProfile, calibratedAt } — set in PR 5
+  writingStyle: null, // { sampleText, styleProfile, calibratedAt } — set via Calibrate button
 };
 
 const refinementHistory = {};  // { [sectionId]: string[] }
@@ -442,7 +442,7 @@ function generateDraft(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage() }, id, "✨ Generated Draft", true, warn);
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
@@ -453,7 +453,7 @@ function improveSection(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage() }, id, "✨ Improved Text", true, warn);
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "✨ Improved Text", true, warn);
 }
 
 function getKeyPoints(id, title) {
@@ -462,7 +462,7 @@ function getKeyPoints(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext, language: getLanguage() }, id, "💡 Key Points to Cover", false, warn);
+  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "💡 Key Points to Cover", false, warn);
 }
 
 async function checkCoherence() {
@@ -586,6 +586,7 @@ function applyFlowRecommendation(sectionId, instruction) {
     currentDraft: prose,
     instruction,
     pubmedContext: getSelectedPubmedContext(),
+    writingStyle: state.writingStyle,
   }, sectionId, "↺ Flow Recommendation", true);
 }
 
@@ -605,6 +606,7 @@ function expandToProse(id, title) {
     pubmedContext,
     userContext,
     language: getLanguage(),
+    writingStyle: state.writingStyle,
   }, id, "✍ Expanded Prose", true, warn);
 }
 
@@ -842,6 +844,7 @@ function scheduleAutoSave() {
       library: state.library,
       customSections: SECTIONS.filter(s => s.isCustom),
       language: getLanguage(),
+      writingStyle: state.writingStyle,
     };
 
     // localStorage write-behind (sync, always)
@@ -1158,7 +1161,7 @@ function applyArticleData(data) {
     state.library = data.library;
     renderLibrary();
   }
-  if (data.writingStyle?.styleProfile) {
+  if (data.writingStyle) {
     state.writingStyle = data.writingStyle;
     renderStyleCard(data.writingStyle);
   }
@@ -1166,6 +1169,57 @@ function applyArticleData(data) {
   SECTIONS.forEach(s => updateWordCount(s.id));
   updateTotalWordCount();
   applyViewMode();
+}
+
+// ── Writing Style ──
+async function calibrateStyle() {
+  if (!articleId) { showToast("Save the article first (open from Dashboard).", "error"); return; }
+  const sampleEl = document.getElementById("style-sample");
+  const sampleText = sampleEl?.value.trim() || "";
+  if (sampleText.length < 100) { showToast("Paste at least 100 characters of sample text.", "error"); return; }
+
+  const btn = document.getElementById("calibrate-btn");
+  btn.disabled = true;
+  btn.textContent = "Calibrating…";
+
+  try {
+    const res = await fetch(`/api/articles/${articleId}/calibrate-style`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sampleText }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const { writingStyle } = await res.json();
+    state.writingStyle = writingStyle;
+    renderStyleCard(writingStyle);
+    showToast("Writing style calibrated.", "success");
+  } catch (err) {
+    showToast("Calibration failed: " + err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Calibrate";
+  }
+}
+
+function renderStyleCard(writingStyle) {
+  const card = document.getElementById("style-card");
+  if (!card) return;
+  if (!writingStyle?.styleProfile) { card.style.display = "none"; return; }
+  const p = writingStyle.styleProfile;
+  const calibratedAt = writingStyle.calibratedAt
+    ? new Date(writingStyle.calibratedAt).toLocaleDateString()
+    : "";
+  card.style.display = "";
+  card.innerHTML = `
+    <div class="style-card-header">Style Profile${calibratedAt ? ` <span class="style-card-date">calibrated ${calibratedAt}</span>` : ""}</div>
+    <div class="style-card-metrics">
+      ${p.toneDescriptor ? `<div class="style-metric"><span class="style-metric-label">Tone</span><span class="style-metric-value">${p.toneDescriptor}</span></div>` : ""}
+      ${p.formalityScore != null ? `<div class="style-metric"><span class="style-metric-label">Formality</span><span class="style-metric-value">${p.formalityScore}/100</span></div>` : ""}
+      ${p.avgSentenceLength ? `<div class="style-metric"><span class="style-metric-label">Avg sentence</span><span class="style-metric-value">${p.avgSentenceLength} words</span></div>` : ""}
+      ${p.activeVoicePercent != null ? `<div class="style-metric"><span class="style-metric-label">Active voice</span><span class="style-metric-value">${p.activeVoicePercent}%</span></div>` : ""}
+      ${p.hedgingFrequency ? `<div class="style-metric"><span class="style-metric-label">Hedging</span><span class="style-metric-value">${p.hedgingFrequency}</span></div>` : ""}
+      ${p.citationDensity ? `<div class="style-metric"><span class="style-metric-label">Citations</span><span class="style-metric-value">${p.citationDensity}</span></div>` : ""}
+    </div>`;
 }
 
 // ── Clear all ──
@@ -1662,6 +1716,7 @@ function refineSection(id, title) {
     currentDraft, instruction,
     pubmedContext: getSelectedPubmedContext(),
     language: getLanguage(),
+    writingStyle: state.writingStyle,
   }, id, "↺ Refined Draft", true);
 }
 
@@ -1735,6 +1790,7 @@ async function startFullDraft() {
         sections: sectionsPayload,
         language: getLanguage(),
         pubmedContext: getSelectedPubmedContext(),
+        writingStyle: state.writingStyle,
       }),
       signal: draftAbortController.signal,
     });

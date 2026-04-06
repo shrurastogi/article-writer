@@ -352,3 +352,11 @@
     .version-label { font-weight: 500; font-size: 0.85rem; color: var(--text); }
     .version-meta { font-size: 0.73rem; color: var(--secondary); margin-top: 2px; }
     .version-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    /* ── Writing Style Card ── */
+    .style-card-header { font-size: 0.82rem; font-weight: 600; color: #6d28d9; margin-bottom: 8px; }
+    .style-card-date { font-weight: 400; color: var(--muted); margin-left: 6px; }
+    .style-card-metrics { display: flex; flex-wrap: wrap; gap: 8px; }
+    .style-metric { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 6px 10px; min-width: 100px; }
+    .style-metric-label { display: block; font-size: 0.72rem; color: var(--muted); }
+    .style-metric-value { display: block; font-size: 0.85rem; font-weight: 600; color: #5b21b6; margin-top: 2px; }

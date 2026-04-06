@@ -86,6 +86,23 @@
       </div>
     </div>
 
+    <!-- Writing Style Calibration -->
+    <div class="panel" style="margin-bottom:12px;border-color:#c4b5fd">
+      <div class="panel-header" style="cursor:pointer;background:#f5f3ff" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+        <span class="panel-title" style="color:#6d28d9">Writing Style</span>
+        <span style="font-size:0.75rem;color:var(--muted)">optional — personalises AI output</span>
+      </div>
+      <div class="panel-body" id="style-panel-body">
+        <p style="font-size:0.82rem;color:var(--secondary);margin:0 0 10px">Paste a sample of your writing (100+ chars) and click <strong>Calibrate</strong>. The AI will match your tone, formality, and sentence rhythm.</p>
+        <div class="form-group">
+          <label>Sample Text</label>
+          <textarea id="style-sample" rows="4" placeholder="Paste a paragraph from a paper you've written…" style="font-size:0.82rem"></textarea>
+        </div>
+        <button id="calibrate-btn" class="btn btn-sm" style="background:#7c3aed;color:#fff;margin-bottom:12px" onclick="calibrateStyle()">Calibrate</button>
+        <div id="style-card" style="display:none"></div>
+      </div>
+    </div>
+
     <!-- Reference Library + PubMed Search (tabbed) -->
     <div class="panel" style="margin-bottom:12px;border-color:#86efac">
       <div class="panel-header" style="cursor:pointer;background:#f0fdf4" onclick="toggleRefLib()">

@@ -25,4 +25,20 @@ function getSectionContext(topic, sectionId, sectionTitle) {
   return map[sectionId] || `the "${sectionTitle}" section of a review article on ${t}`;
 }
 
-module.exports = { getSectionContext };
+/**
+ * Build a style instruction string from a calibrated writingStyle object.
+ * Returns empty string if no valid profile is present.
+ */
+function getStyleInstruction(writingStyle) {
+  if (!writingStyle?.styleProfile) return "";
+  const p = writingStyle.styleProfile;
+  const parts = [];
+  if (p.toneDescriptor)         parts.push(`tone is ${p.toneDescriptor}`);
+  if (p.formalityScore !== null && p.formalityScore !== undefined) parts.push(`formality ${p.formalityScore}/100`);
+  if (p.avgSentenceLength)      parts.push(`avg sentence length ~${p.avgSentenceLength} words`);
+  if (p.hedgingFrequency)       parts.push(`hedging ${p.hedgingFrequency}`);
+  if (!parts.length) return "";
+  return `Writing style guidance: ${parts.join(", ")}. Match this style.`;
+}
+
+module.exports = { getSectionContext, getStyleInstruction };
