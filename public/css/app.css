@@ -180,8 +180,8 @@
     .p-abstract-box { background: #f7f7f7; border: 1px solid #ddd; border-radius: 3px; padding: 14px 18px; margin: 14px 0; }
     .p-abstract-label { font-weight: bold; font-size: 10.5pt; margin-bottom: 5px; }
     .p-keywords { font-size: 9.5pt; color: #444; margin-bottom: 20px; border-top: 1px solid #eee; padding-top: 8px; }
-    .p-section-title { font-size: 12pt; font-weight: bold; margin-top: 22px; margin-bottom: 7px; padding-bottom: 3px; border-bottom: 1.5px solid #222; page-break-after: avoid; page-break-inside: avoid; }
-    .p-body { font-size: 10.5pt; text-align: justify; margin-bottom: 7px; white-space: pre-wrap; page-break-inside: avoid; }
+    .p-section-title { font-size: 12pt; font-weight: bold; margin-top: 22px; margin-bottom: 7px; padding-bottom: 3px; border-bottom: 1.5px solid #222; page-break-after: avoid; break-after: avoid; page-break-inside: avoid; }
+    .p-body { font-size: 10.5pt; text-align: justify; margin-bottom: 7px; white-space: pre-wrap; }
     .p-abstract-box { page-break-inside: avoid; }
     .p-empty { text-align: center; color: #94a3b8; margin-top: 80px; font-family: sans-serif; font-size: 14px; }
 

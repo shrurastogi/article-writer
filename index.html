@@ -264,13 +264,13 @@
     <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)" />
 
     <div style="font-weight:600;font-size:0.88rem;margin-bottom:10px">Invite Collaborator</div>
-    <div style="display:flex;gap:6px;margin-bottom:12px">
-      <input id="collab-email" type="email" placeholder="colleague@example.com" style="flex:1;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px" />
-      <select id="collab-role" style="font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px">
+    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+      <input id="collab-email" type="email" placeholder="colleague@example.com" style="flex:1;min-width:0;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px" />
+      <select id="collab-role" style="width:84px;flex-shrink:0;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;padding:6px 8px">
         <option value="viewer">Viewer</option>
         <option value="editor">Editor</option>
       </select>
-      <button class="btn btn-sm" onclick="addCollaborator()">Invite</button>
+      <button class="btn btn-sm" style="flex-shrink:0" onclick="addCollaborator()">Invite</button>
     </div>
     <div id="collaborators-list" style="font-size:0.82rem;color:var(--secondary)"></div>
 

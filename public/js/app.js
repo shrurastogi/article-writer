@@ -34,7 +34,7 @@ let tableModalSectionId = null;
 let dragSourceId = null;
 let autoSaveTimer = null;
 let lastVersionHash = null;
-const articleId = new URLSearchParams(window.location.search).get("id");
+let articleId = new URLSearchParams(window.location.search).get("id");
 const viewMode = new URLSearchParams(window.location.search).get("mode") === "view";
 
 // ── Dark mode ──
@@ -51,11 +51,12 @@ function toggleDarkMode() {
   applyTheme();
 }
 
-const FONT_SIZES = [12, 13, 14, 15, 16, 17, 18];
-const FONT_DEFAULT = 14;
+const FONT_SIZES = [13, 14, 15, 16, 17, 18, 20];
+const FONT_DEFAULT = 16;
 
 function applyFontSize(size) {
   document.documentElement.style.setProperty("--base-font-size", size + "px");
+  document.documentElement.style.fontSize = size + "px";
 }
 
 function adjustFontSize(delta) {
@@ -744,9 +745,9 @@ function renderGrammarResults(id, rawText) {
     const fragment = parts[2] || "";
     const suggestion = parts[3] || "";
     return `<div class="grammar-issue-card">
-      <span class="grammar-issue-type">${escHtml(typeLabels[type] || type)}</span>
-      <div class="grammar-fragment">"${escHtml(fragment)}"</div>
-      <div class="grammar-suggestion">${escHtml(suggestion)}</div>
+      <span class="grammar-issue-type">${htmlEsc(typeLabels[type] || type)}</span>
+      <div class="grammar-fragment">"${htmlEsc(fragment)}"</div>
+      <div class="grammar-suggestion">${htmlEsc(suggestion)}</div>
     </div>`;
   }).join("");
 }
@@ -922,6 +923,38 @@ function scheduleAutoSave() {
 
 // ── Article Versioning ────────────────────────────────────────────────────────
 
+// Ensures article exists on server. If not, creates it and updates URL.
+async function ensureArticleSaved() {
+  if (articleId) return true;
+  try {
+    const createRes = await fetch("/api/articles", { method: "POST" });
+    if (!createRes.ok) throw new Error();
+    const { article } = await createRes.json();
+    articleId = article._id;
+    const payload = {
+      topic: document.getElementById("medical-topic").value,
+      title: document.getElementById("article-title").value,
+      authors: document.getElementById("authors").value,
+      keywords: document.getElementById("keywords").value,
+      sections: state.sections,
+      library: state.library,
+      customSections: SECTIONS.filter(s => s.isCustom),
+      language: getLanguage(),
+      writingStyle: state.writingStyle,
+    };
+    await fetch(`/api/articles/${articleId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    history.replaceState({}, "", `/?id=${articleId}`);
+    return true;
+  } catch {
+    showToast("Could not save article. Please try again.", "error");
+    return false;
+  }
+}
+
 function hashSections() {
   try { return btoa(JSON.stringify(state.sections)).slice(0, 32); }
   catch { return ""; }
@@ -942,7 +975,7 @@ async function autoSnapshot() {
 }
 
 async function saveVersionManual() {
-  if (!articleId) { showToast("Save the article first.", "error"); return; }
+  if (!await ensureArticleSaved()) return;
   const label = prompt("Version label (optional):", "") ?? "";
   try {
     const res = await fetch(`/api/articles/${articleId}/versions`, {
@@ -959,7 +992,7 @@ async function saveVersionManual() {
 }
 
 async function openVersionHistory() {
-  if (!articleId) { showToast("No article loaded.", "error"); return; }
+  if (!await ensureArticleSaved()) return;
   try {
     const res = await fetch(`/api/articles/${articleId}/versions`);
     if (!res.ok) throw new Error("Failed");
@@ -1580,7 +1613,7 @@ async function openAddSectionModal() {
     if (suggestions?.length) {
       document.getElementById("suggestions-topic-label").textContent = topic;
       document.getElementById("section-suggestion-chips").innerHTML = suggestions
-        .map(s => `<button class="suggestion-chip" onclick="pickSuggestion(event,${JSON.stringify(s)})">${htmlEsc(s)}</button>`)
+        .map(s => `<button class="suggestion-chip" onclick="pickSuggestion(this,${JSON.stringify(s)})">${htmlEsc(s)}</button>`)
         .join("");
       document.getElementById("section-suggestions-area").style.display = "block";
     }
@@ -1591,9 +1624,9 @@ async function openAddSectionModal() {
   }
 }
 
-function pickSuggestion(e, title) {
+function pickSuggestion(el, title) {
   document.querySelectorAll(".suggestion-chip").forEach(c => c.classList.remove("chip-selected"));
-  e.currentTarget.classList.add("chip-selected");
+  el.classList.add("chip-selected");
   const input = document.getElementById("new-section-title");
   input.value = title;
   input.dispatchEvent(new Event("input"));
@@ -1828,7 +1861,7 @@ async function startFullDraft() {
   subtitle.textContent = "Generating drafts for each section…";
   list.innerHTML = sectionsPayload.map(s =>
     `<div class="draft-section-row" id="drow-${s.id}">
-      <div class="draft-section-row-title">${escHtml(s.title)}</div>
+      <div class="draft-section-row-title">${htmlEsc(s.title)}</div>
       <span class="draft-section-status" id="dstatus-${s.id}">Queued</span>
     </div>`
   ).join("");
@@ -1889,8 +1922,8 @@ function handleDraftEvent(evt) {
     if (row) {
       const preview = evt.content.slice(0, 120).replace(/\n/g, " ");
       row.innerHTML = `
-        <div class="draft-section-row-title">${escHtml(evt.title)}</div>
-        <div class="draft-section-preview">${escHtml(preview)}…</div>
+        <div class="draft-section-row-title">${htmlEsc(evt.title)}</div>
+        <div class="draft-section-preview">${htmlEsc(preview)}…</div>
         <div class="draft-section-actions">
           <button class="btn btn-ai btn-sm" onclick="approveDraftSection('${evt.id}',${JSON.stringify(evt.content)})">Apply</button>
           <button class="btn btn-secondary btn-sm" onclick="skipDraftSection('${evt.id}')">Skip</button>
