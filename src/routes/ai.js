@@ -1,7 +1,7 @@
 "use strict";
 
 const router = require("express").Router();
-const { getClient, MODEL } = require("../services/llmService");
+const { createCompletion, MODEL } = require("../services/llmService");
 const { getSectionContext, getStyleInstruction } = require("../services/sectionContext");
 const Article = require("../models/Article");
 const { requireApiAuth } = require("../middleware/auth");
@@ -42,7 +42,7 @@ Requirements:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
@@ -101,7 +101,7 @@ ${content}`;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
@@ -156,7 +156,7 @@ Format as a clear bulleted list. Each point must be specific and actionable, not
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 900,
       messages: [{ role: "user", content: prompt }],
@@ -216,7 +216,7 @@ Example structure:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 1200,
       messages: [{ role: "user", content: prompt }],
@@ -274,7 +274,7 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
@@ -336,7 +336,7 @@ Be direct and specific. Do not pad with generic praise.`;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
@@ -392,7 +392,7 @@ Rules:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await getClient().chat.completions.create({
+    const stream = await createCompletion({
       model: MODEL,
       max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
@@ -432,7 +432,7 @@ Text:
 """${sampleText.trim().slice(0, 3000)}"""`;
 
   try {
-    const completion = await getClient().chat.completions.create({
+    const completion = await createCompletion({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       stream: false,
@@ -475,7 +475,7 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 ["Epidemiology & Incidence", "Pathophysiology", "Diagnostic Criteria", "Treatment Approaches", "Emerging Therapies", "Prognosis & Outcomes"]`;
 
   try {
-    const completion = await getClient().chat.completions.create({
+    const completion = await createCompletion({
       model: MODEL,
       max_tokens: 300,
       messages: [{ role: "user", content: prompt }],
@@ -541,7 +541,7 @@ Requirements:
 - Comprehensive yet concise (300–600 words for most sections)
 - Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
 
-      const stream = await getClient().chat.completions.create({
+      const stream = await createCompletion({
         model: MODEL,
         max_tokens: 1800,
         messages: [{ role: "user", content: prompt }],

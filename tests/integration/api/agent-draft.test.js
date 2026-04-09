@@ -25,6 +25,7 @@ jest.mock("../../../src/services/llmService", () => {
     };
   }
   return {
+    createCompletion: jest.fn().mockResolvedValue(makeStream()),
     getClient: () => ({
       chat: {
         completions: {
