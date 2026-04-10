@@ -8,7 +8,7 @@
 |---|---|
 | Product | Medical Article Writer |
 | Version | 2.0 |
-| Last Updated | 2026-04-04 |
+| Last Updated | 2026-04-10 |
 | Status | Living Document |
 
 **How to use this document:** Features marked ✅ are shipped. Features marked 📋 are planned. Add new requirements under the relevant module or in Section 9 (Roadmap). Each requirement has a short ID (e.g. `F2-3`) for cross-referencing.
@@ -115,7 +115,7 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 | F3-7 | Editable AI Box | AI suggestion text is directly editable before applying | ✅ |
 | F3-8 | Section-aware Prompts | Each section has a distinct, topic-aware system prompt (e.g. references section requests Vancouver format, abstract requests structured IMRAD format) | ✅ |
 | F3-9 | Paper Flow Checker | AI reviews the full article across all filled sections and returns: overall verdict, section-by-section transition analysis (✅/⚠️/❌), specific issues found, and numbered recommendations | ✅ |
-| F3-10 | Refine from Flow Check | "Apply to Section" button on each Flow Check recommendation opens that section and pre-fills the refine instruction box | 📋 Sprint 4 |
+| F3-10 | Context-aware Coherence Fix | "Apply" button on each Flow Check recommendation calls `/api/coherence-fix` — rewrites the section using adjacent section content (prev last 400 chars, next first 400 chars) as context to ensure smooth transitions | ✅ |
 | F3-11 | User-supplied Context ("Add Your Data") | Collapsible "Add Your Data" textarea per section. User-pasted content (study data, notes, institutional data) is passed as additional context to all AI actions for that section | 📋 Sprint 5 |
 | F3-12 | Visual AI Confidence Indicator | Color-coded bar (green = 3+ sources / yellow = 1–2 sources / red = 0 sources) under each AI action button. Tooltip shows supporting PMIDs used for the last generation | 📋 Sprint 4 |
 | F3-13 | Context Grounding | Soft mode (default): warning shown when generating without selected refs. Strict mode (user-configurable): blocks AI generation entirely unless ≥1 library paper is selected | 📋 Sprint 4 |
@@ -501,10 +501,11 @@ Production loads `.env`; development loads `.env.development`; test environment 
 
 | ID | Feature | Description | Sprint |
 |---|---|---|---|
-| F13-1 | BYOK — LLM API Key | User enters provider API key (Groq / OpenAI / OpenRouter / Claude / Gemini). Encrypted with AES-256-GCM at rest (`ENCRYPTION_KEY` env var). Falls back to server env key if user has none | 📋 6 |
-| F13-2 | LLM Model Selector | Provider + model dropdown in Settings. Dynamic model list via `GET /api/llm/models`. Stored per-user in `user.llmConfig`. Sprint 6: Groq + OpenAI + OpenRouter. Sprint 8: Claude + Gemini | 📋 6/8 |
-| F13-3 | NCBI API Key | User supplies own NCBI key in Settings. Stored in `user.researchConfig`. Raises PubMed rate limit to 10 req/s | 📋 6 |
-| F13-4 | Default Config + Reset-to-Defaults | `DEFAULT_CONFIG` constant (Groq / llama-3.3-70b-versatile / HuggingFace embeddings / LanceDB / Light theme / English / Strict mode OFF). "Modified" badge on each changed setting. "Reset all to defaults" restores `DEFAULT_CONFIG` in one click | 📋 6 |
+| F13-1 | BYOK — LLM API Key | User enters provider API key (Groq / OpenAI / OpenRouter / Claude / Gemini). Encrypted with AES-256-GCM at rest (`ENCRYPTION_KEY` env var). Falls back to server env key if user has none | ✅ |
+| F13-2 | LLM Model Selector | Provider + model dropdown in Settings. Dynamic model list via `GET /api/llm/models`. Stored per-user in `user.llmConfig`. Sprint 6: Groq + OpenAI + OpenRouter. Sprint 8: Claude + Gemini | ✅ (Groq) |
+| F13-3 | NCBI API Key | User supplies own NCBI key in Settings. Stored in `user.researchConfig`. Raises PubMed rate limit to 10 req/s | ✅ |
+| F13-4 | Default Config + Reset-to-Defaults | `DEFAULT_CONFIG` constant (Groq / llama-3.3-70b-versatile / HuggingFace embeddings / LanceDB / Light theme / English / Strict mode OFF). "Modified" badge on each changed setting. "Reset all to defaults" restores `DEFAULT_CONFIG` in one click | ✅ |
+| F13-5 | Groq API Key Pool Rotation | System supports up to 4 Groq API keys (`GROQ_API_KEY` through `GROQ_API_KEY_4`). On HTTP 429, auto-rotates to the next available key — transparent to the user. Prevents rate-limit errors during heavy use | ✅ |
 
 ---
 

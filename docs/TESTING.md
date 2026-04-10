@@ -6,8 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.0 |
-| Last Updated | 2026-04-04 |
+| Version | 1.1 |
+| Last Updated | 2026-04-10 |
 | Status | Living Document |
 
 Update this document each sprint: add new edge cases as you discover them, update coverage targets as the codebase grows.
@@ -100,36 +100,27 @@ Baselines stored in `tests/performance/baselines.json` (committed to repo).
 ```
 tests/
   unit/
-    services/
-      llmService.test.js
-      pubmedService.test.js
-      exportService.test.js
-      sectionContext.test.js
-    utils/
-      fetchWithRetry.test.js
-      parsePubMedXML.test.js
+    config.test.js                  # startup config validation
     middleware/
-      requireAuth.test.js
       rateLimit.test.js
-    frontend/
-      enhanceCitations.test.js
-      wordCount.test.js
-      htmlEsc.test.js
+    server/
+      version-endpoint.test.js
+    utils/
+      detectWriteMode.test.js
   integration/
-    auth.test.js
-    articles.test.js
-    ai.test.js
-    pubmed.test.js
-    export.test.js
+    api/
+      agent-draft.test.js           # POST /api/agent/draft (SSE)
+      ai.test.js                    # all AI streaming endpoints
+      articles.test.js              # article CRUD + clone/lock/share/collaborators
+      auth.test.js                  # register, login, logout, session
+      export.test.js                # DOCX + PDF export
+      settings.test.js              # settings GET/PUT + BYOK keys
+      sharing.test.js               # share tokens + collaborators
+      suggest-sections.test.js      # POST /api/suggest-sections
+      versions.test.js              # article version history
   e2e/
-    auth.spec.ts
-    article-lifecycle.spec.ts
-    ai-generate.spec.ts
-    references.spec.ts
-    tables.spec.ts
-    flow-check.spec.ts
-    export.spec.ts
     dashboard.spec.ts
+    editor.spec.ts
   performance/
     ai-endpoints.perf.js
     article-list.perf.js
@@ -141,11 +132,22 @@ tests/
     ncbi-oa-response.xml
     mock-article.json
     mock-user.json
-  setup/
-    globalSetup.js
-    globalTeardown.js
-    jest.setup.js
+  globalSetup.js
+  globalTeardown.js
+  jestSetup.js
 ```
+
+**Note on LLM mocks:** All integration tests that touch AI endpoints mock `src/services/llmService` at the module level, exposing both `createCompletion` and `getClient`:
+
+```js
+jest.mock('../../../src/services/llmService', () => ({
+  createCompletion: jest.fn().mockResolvedValue(makeStream()),
+  getClient: () => ({ chat: { completions: { create: jest.fn().mockResolvedValue(makeStream()) } } }),
+  MODEL: 'test-model',
+}));
+```
+
+This ensures tests continue to pass after the key-rotation refactor (all routes now call `createCompletion` instead of `getClient().chat.completions.create`).
 
 ---
 
@@ -269,13 +271,18 @@ This section is a living reference. Add new cases each sprint.
 |---|---|
 | Missing required field `topic` | `400` with `code: "MISSING_FIELD"` — Groq never called |
 | `pubmedContext` exceeds 6000 chars | Truncated server-side before prompt construction |
-| Groq API returns 429 | `502` with `code: "LLM_RATE_LIMIT"` |
+| Groq API returns 429 on all keys | `502` with `code: "LLM_RATE_LIMIT"` — after exhausting the full key pool |
+| Groq API returns 429 on first key only | Transparent retry on next key — no error surfaced to client |
 | Groq API unreachable (network error) | `502` with `code: "LLM_UNAVAILABLE"` — no server crash |
 | Client disconnects mid-stream | `res.on('close')` stops streaming — no unhandled promise rejection |
 | Empty section prose in coherence check | Section skipped in analysis; report notes it was empty |
 | All sections empty in coherence check | `400` — cannot check with no content |
 | Empty `instruction` field in `/api/refine` | `400` — instruction is required |
 | Very long `currentDraft` (> 5000 words) | Truncated before sending to stay within LLM context window |
+| `/api/coherence-fix` missing `recommendation` | `400` — recommendation is required |
+| `/api/coherence-fix` missing `currentDraft` | `400` — currentDraft is required |
+| `/api/coherence-fix` with no adjacent sections | `prevSection`/`nextSection` omitted — AI fixes in isolation (valid) |
+| `/api/coherence-fix` with empty adjacent prose | Adjacent section treated as absent — no context injected |
 
 ---
 
@@ -346,13 +353,15 @@ This section is a living reference. Add new cases each sprint.
 
 ## 7. Sprint-by-Sprint Test Coverage Plan
 
-| Sprint | New test files required |
-|---|---|
-| Sprint 1 (retroactive) | `unit/utils/parsePubMedXML.test.js`, `unit/middleware/requireAuth.test.js`, `integration/auth.test.js`, `integration/articles.test.js`, `integration/pubmed.test.js`, `e2e/auth.spec.ts`, `e2e/article-lifecycle.spec.ts` |
-| Sprint 2 | `unit/config.test.js` (startup validation), `unit/version-endpoint.test.js` |
-| Sprint 3 | Update all test imports to `src/` paths after refactor. Add `unit/middleware/rateLimit.test.js` |
-| Sprint 4 | `integration/ai.test.js`, `integration/export.test.js`, `unit/services/sectionContext.test.js`, `e2e/ai-generate.spec.ts`, `e2e/export.spec.ts`, `performance/ai-endpoints.perf.js` |
-| Sprint 5 | `integration/clone.test.js`, `integration/agent-draft.test.js`, `e2e/dashboard.spec.ts`, `e2e/flow-check.spec.ts` |
-| Sprint 6 | `integration/versioning.test.js`, `integration/sharing.test.js`, `integration/settings.test.js`, `unit/services/encryptionService.test.js` |
-| Sprint 7 | `integration/rag.test.js`, `integration/upload.test.js`, `performance/docx-export.perf.js` |
-| Sprint 8 | `integration/agents.test.js`, `e2e/agent-pipeline.spec.ts`, `performance/article-list.perf.js` |
+| Sprint | Status | Test files delivered |
+|---|---|---|
+| Sprint 1 | ✅ | `integration/api/auth.test.js`, `integration/api/articles.test.js` |
+| Sprint 2 | ✅ | `unit/config.test.js`, `unit/server/version-endpoint.test.js` |
+| Sprint 3 | ✅ | Updated all imports to `src/` paths. `unit/middleware/rateLimit.test.js` |
+| Sprint 4 | ✅ | `integration/api/ai.test.js`, `integration/api/export.test.js`, `unit/utils/detectWriteMode.test.js` |
+| Sprint 5 | ✅ | `integration/api/agent-draft.test.js`, `integration/api/suggest-sections.test.js`, `e2e/dashboard.spec.ts`, `e2e/editor.spec.ts` |
+| Sprint 6 | ✅ | `integration/api/versions.test.js`, `integration/api/sharing.test.js`, `integration/api/settings.test.js` |
+| Sprint 7 | 📋 | `integration/api/planner.test.js`, `integration/api/websearch.test.js`, `performance/docx-export.perf.js` |
+| Sprint 8 | 📋 | `integration/agents.test.js`, `e2e/agent-pipeline.spec.ts`, `performance/article-list.perf.js` |
+
+**Current total:** 110 tests across 13 suites (all passing).

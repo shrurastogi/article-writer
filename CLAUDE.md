@@ -17,8 +17,8 @@ Use these slash commands when working on specific areas:
 
 | Command | When to use |
 |---|---|
-| `/frontend` | Building or modifying UI in `index.html` |
-| `/backend` | Adding or modifying endpoints in `server.js` |
+| `/frontend` | Building or modifying UI in `public/js/app.js`, `public/css/app.css`, or HTML files |
+| `/backend` | Adding or modifying endpoints in `src/routes/` |
 | `/test` | Writing unit, integration, or E2E tests |
 | `/review` | Reviewing staged changes or a PR before merge |
 | `/sprint` | Planning a new sprint from PRD backlog items |
@@ -62,19 +62,26 @@ Required env vars — see `.env.example` for the full list. Minimum to run local
 - `SESSION_SECRET` — required (any string locally)
 - `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` + `GOOGLE_CALLBACK_URL` — required for Google OAuth
 
-## Architecture (Sprint 1 state)
+## Architecture (Sprint 6 delivered state)
 
-Three HTML files served by a single `server.js` (Express), backed by MongoDB Atlas:
+Three HTML files served by a modular Express app (`src/app.js`), backed by MongoDB Atlas:
 
 - **`login.html`** — Unauthenticated entry. Google OAuth + email/password sign-in.
-- **`dashboard.html`** — Post-auth landing. Article card grid with create/open/delete actions.
-- **`index.html`** — Article editor. All section editing, AI generation, reference library, export UI. Auto-saves to server via `PUT /api/articles/:id`.
+- **`dashboard.html`** — Post-auth landing. Article card grid with create/open/delete/clone actions.
+- **`index.html`** — Article editor. All section editing, AI generation, reference library, version history, export UI. Auto-saves via `PUT /api/articles/:id`. Frontend JS in `public/js/app.js`, CSS in `public/css/app.css`.
 
-**`server.js`** handles all routes:
-- **Auth**: `/auth/google`, `/auth/login`, `/auth/register`, `/auth/logout`, `/auth/me` (Passport.js)
-- **Articles**: `GET/POST/PUT/DELETE /api/articles/:id` (MongoDB Atlas)
-- **Streaming AI**: `/api/generate`, `/api/improve`, `/api/keypoints`, `/api/refine`, `/api/generate-table`, `/api/coherence-check` → Groq (`llama-3.3-70b-versatile`)
-- **PubMed**: `/api/pubmed-search`, `/api/fetch-pmids` → NCBI E-utilities
-- **Export**: `/api/export-docx` → `docx` package; `/api/version`
+**`src/routes/`** contains all route handlers:
+- **`auth.js`**: `/auth/google`, `/auth/login`, `/auth/register`, `/auth/logout`, `/auth/me` (Passport.js)
+- **`articles.js`**: `GET/POST/PUT/DELETE /api/articles/:id` + clone, lock/unlock, share, collaborators (MongoDB Atlas)
+- **`ai.js`**: Streaming AI endpoints → Groq (`llama-3.3-70b-versatile`) via `src/services/llmService.js`
+  - `/api/generate`, `/api/improve`, `/api/keypoints`, `/api/refine`, `/api/generate-table`
+  - `/api/coherence-check`, `/api/coherence-fix`, `/api/grammar-check`, `/api/suggest-sections`
+  - `/api/agent/draft` (SSE, multi-section)
+- **`versions.js`**: Article version history (save, list, restore, delete)
+- **`settings.js`**: User settings + BYOK API key management (AES-256-GCM encrypted)
+- **`pubmed.js`**: `/api/pubmed-search`, `/api/fetch-pmids` → NCBI E-utilities
+- **`export.js`**: `/api/export-docx`, `/api/export-pdf` → `docx` package + Puppeteer
+
+**`src/services/llmService.js`** manages the Groq client with auto key-rotation across up to 4 keys (`GROQ_API_KEY` through `GROQ_API_KEY_4`) on 429 rate-limit errors.
 
 See `docs/ARCHITECTURE.md` for the full architecture including data models, data flows, and planned changes.

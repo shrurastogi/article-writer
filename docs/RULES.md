@@ -95,6 +95,7 @@ Scope is optional: `feat(auth): add Google OAuth callback` is also valid.
 - `docs/PRD.md` is the source of truth for what is being built and why.
 - `docs/ARCHITECTURE.md` must be updated whenever the system architecture changes (new endpoints, new storage layer, new external dependencies).
 - `docs/API.md` must be updated whenever a new API endpoint is added or an existing one changes.
+- `docs/BUGS.md` must be updated when a bug is discovered (with root cause) and when it is fixed (with fix date and commit).
 - `CLAUDE.md` (repo root) is the entry point for Claude Code — it must always reference the docs that are relevant to the current session.
 - Do not put architecture decisions, product decisions, or API contracts in commit messages alone — they must be in a `docs/` file.
 
@@ -142,7 +143,7 @@ Scope is optional: `feat(auth): add Google OAuth callback` is also valid.
 
 ## 5. Brand & Design
 
-- **Color palette follows GSK brand guidelines.** See CSS variables in `public/style.css` (post-Sprint 3 refactor) — do not introduce new colors without updating the variable definitions.
+- **Color palette follows GSK brand guidelines.** See CSS variables in `public/css/app.css` — do not introduce new colors without updating the variable definitions.
 - GSK primary orange: `#F36633`
 - GSK navy: `#1A1F71`
 - The GSK logo in the header (`assets/gsk-logo.svg`) must not be removed or restyled.

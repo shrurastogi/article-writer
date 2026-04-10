@@ -435,6 +435,35 @@ Review the full article for flow and narrative consistency.
 
 ---
 
+### POST /api/coherence-fix
+Context-aware rewrite of a single section to resolve a specific flow issue identified by `/api/coherence-check`. Receives adjacent section content so the AI can ensure smooth transitions to and from neighbouring sections.
+
+**Request**
+```json
+{
+  "topic": "string (required)",
+  "sectionTitle": "string (required)",
+  "currentDraft": "string (required) — current prose of the section to fix",
+  "recommendation": "string (required) — the specific flow issue or instruction to address",
+  "prevSection": {
+    "title": "string",
+    "prose": "string"
+  },
+  "nextSection": {
+    "title": "string",
+    "prose": "string"
+  },
+  "language": "string (optional, default: English)",
+  "writingStyle": "string (optional)"
+}
+```
+`prevSection` and `nextSection` are optional. When provided, the last 400 chars of `prevSection.prose` and the first 400 chars of `nextSection.prose` are used as context. The AI returns only the revised section text — no commentary.
+
+**Response:** `text/plain` stream of the rewritten section prose.  
+**Errors:** `400` missing topic, currentDraft, or recommendation.
+
+---
+
 ### POST /api/grammar-check
 Check a section for grammar and style issues (passive voice, long sentences, informal language, hedging).
 
