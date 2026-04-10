@@ -354,6 +354,70 @@ Be direct and specific. Do not pad with generic praise.`;
   }
 });
 
+// Context-aware coherence fix — rewrites one section with knowledge of adjacent sections
+router.post("/coherence-fix", async (req, res) => {
+  const { topic, sectionTitle, currentDraft, recommendation, prevSection, nextSection, language, writingStyle } = req.body;
+
+  if (!topic?.trim()) {
+    return res.status(400).json({ error: "A medical topic is required." });
+  }
+  if (!currentDraft?.trim()) {
+    return res.status(400).json({ error: "No current draft provided." });
+  }
+  if (!recommendation?.trim()) {
+    return res.status(400).json({ error: "No recommendation provided." });
+  }
+
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
+  const styleText = getStyleInstruction(writingStyle);
+
+  const prevBlock = prevSection?.prose?.trim()
+    ? `\n\nPreceding section — "${prevSection.title}" (final part):\n${prevSection.prose.trim().slice(-400)}`
+    : "";
+  const nextBlock = nextSection?.prose?.trim()
+    ? `\n\nFollowing section — "${nextSection.title}" (opening part):\n${nextSection.prose.trim().slice(0, 400)}`
+    : "";
+
+  const prompt = `${languagePrefix}You are a senior medical editor fixing a coherence issue in a review article on "${topic.trim()}".
+
+Issue to fix in the "${sectionTitle}" section:
+${recommendation}
+
+Section to revise:
+${currentDraft}${prevBlock}${nextBlock}
+
+Rewrite the "${sectionTitle}" section to:
+1. Fix the stated issue precisely
+2. Flow naturally FROM the preceding section — do not repeat points it already made${prevSection ? ` ("${prevSection.title}")` : ""}
+3. Set up the following section logically — leave its content for it to cover${nextSection ? ` ("${nextSection.title}")` : ""}
+4. Preserve all unique clinical content, data, and citations in the current draft${styleText ? `\n5. ${styleText}` : ""}
+
+Return ONLY the revised section text — no heading, no preamble, no explanation.`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await createCompletion({
+      model: MODEL,
+      max_tokens: 1800,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    logger.error({ msg: "Groq API error in coherence-fix", error: err.message });
+    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+  }
+});
+
 // Grammar and style check for a section
 router.post("/grammar-check", async (req, res) => {
   const { content, topic, sectionTitle, language } = req.body;

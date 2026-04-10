@@ -621,7 +621,7 @@ function inferSectionFromText(text) {
   return best;
 }
 
-// Open a section and immediately stream a refinement using the given recommendation as instruction
+// Open a section and stream a context-aware coherence fix (knows prev + next sections)
 function applyFlowRecommendation(sectionId, instruction) {
   const prose = state.sections[sectionId]?.prose?.trim();
   const section = SECTIONS.find(s => s.id === sectionId);
@@ -629,20 +629,36 @@ function applyFlowRecommendation(sectionId, instruction) {
     showToast(`Add content to the ${section?.title || sectionId} section first, then apply the recommendation.`, "error");
     return;
   }
+
+  // Find adjacent sections so the AI can avoid disconnections
+  const idx = SECTIONS.findIndex(s => s.id === sectionId);
+  const prevSec = idx > 0 ? SECTIONS[idx - 1] : null;
+  const nextSec = idx < SECTIONS.length - 1 ? SECTIONS[idx + 1] : null;
+
+  const prevSection = prevSec && state.sections[prevSec.id]?.prose?.trim()
+    ? { title: prevSec.title, prose: state.sections[prevSec.id].prose }
+    : null;
+  const nextSection = nextSec && state.sections[nextSec.id]?.prose?.trim()
+    ? { title: nextSec.title, prose: state.sections[nextSec.id].prose }
+    : null;
+
   // Scroll to and expand the section
   const panel = document.getElementById(`section-${sectionId}`);
   if (panel) {
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
     panel.classList.add("open");
   }
-  streamToAiBox("/api/refine", {
+
+  streamToAiBox("/api/coherence-fix", {
     topic: getTopic(),
     sectionTitle: section?.title || sectionId,
     currentDraft: prose,
-    instruction,
-    pubmedContext: getSelectedPubmedContext(),
+    recommendation: instruction,
+    prevSection,
+    nextSection,
+    language: getLanguage(),
     writingStyle: state.writingStyle,
-  }, sectionId, "↺ Flow Recommendation", true);
+  }, sectionId, "↺ Coherence Fix", true);
 }
 
 function expandToProse(id, title) {
