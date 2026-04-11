@@ -1,7 +1,7 @@
 "use strict";
 
 const router = require("express").Router();
-const { createCompletion, MODEL } = require("../services/llmService");
+const { createCompletionForUser, MODEL } = require("../services/llmService");
 const { getSectionContext, getStyleInstruction } = require("../services/sectionContext");
 const Article = require("../models/Article");
 const { requireApiAuth } = require("../middleware/auth");
@@ -42,12 +42,12 @@ Requirements:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -55,8 +55,8 @@ Requirements:
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -101,12 +101,12 @@ ${content}`;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -114,8 +114,8 @@ ${content}`;
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -156,12 +156,12 @@ Format as a clear bulleted list. Each point must be specific and actionable, not
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 900,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -169,8 +169,8 @@ Format as a clear bulleted list. Each point must be specific and actionable, not
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -216,12 +216,12 @@ Example structure:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1200,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -229,8 +229,8 @@ Example structure:
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -274,12 +274,12 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -287,8 +287,8 @@ Return ONLY the refined section text — no heading, no preamble, no explanation
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -336,12 +336,12 @@ Be direct and specific. Do not pad with generic praise.`;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -349,8 +349,8 @@ Be direct and specific. Do not pad with generic praise.`;
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -400,12 +400,12 @@ Return ONLY the revised section text — no heading, no preamble, no explanation
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 1800,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -413,8 +413,8 @@ Return ONLY the revised section text — no heading, no preamble, no explanation
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error in coherence-fix", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error in coherence-fix", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -456,12 +456,12 @@ Rules:
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
-    const stream = await createCompletion({
+    const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
       stream: true,
-    });
+    }, req.user);
 
     for await (const chunk of stream) {
       const text = chunk.choices[0]?.delta?.content || "";
@@ -469,8 +469,8 @@ Rules:
     }
     res.end();
   } catch (err) {
-    logger.error({ msg: "Groq API error", error: err.message });
-    res.status(500).json({ error: "Failed to call Groq API: " + err.message });
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
   }
 });
 
@@ -496,11 +496,11 @@ Text:
 """${sampleText.trim().slice(0, 3000)}"""`;
 
   try {
-    const completion = await createCompletion({
+    const completion = await createCompletionForUser({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       stream: false,
-    });
+    }, req.user);
     const raw = completion.choices[0].message.content.trim();
     let styleProfile;
     try { styleProfile = JSON.parse(raw); }
@@ -539,12 +539,12 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 ["Epidemiology & Incidence", "Pathophysiology", "Diagnostic Criteria", "Treatment Approaches", "Emerging Therapies", "Prognosis & Outcomes"]`;
 
   try {
-    const completion = await createCompletion({
+    const completion = await createCompletionForUser({
       model: MODEL,
       max_tokens: 300,
       messages: [{ role: "user", content: prompt }],
       stream: false,
-    });
+    }, req.user);
 
     const raw = completion.choices[0]?.message?.content?.trim() || "[]";
     const match = raw.match(/\[[\s\S]*\]/);
@@ -605,12 +605,12 @@ Requirements:
 - Comprehensive yet concise (300–600 words for most sections)
 - Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
 
-      const stream = await createCompletion({
+      const stream = await createCompletionForUser({
         model: MODEL,
         max_tokens: 1800,
         messages: [{ role: "user", content: prompt }],
         stream: true,
-      });
+      }, req.user);
 
       let content = "";
       for await (const chunk of stream) {

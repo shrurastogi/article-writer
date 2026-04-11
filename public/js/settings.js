@@ -18,29 +18,17 @@ function showToast(msg, type = "success") {
   const savedTheme = localStorage.getItem("theme");
   if (savedTheme === "dark") document.documentElement.setAttribute("data-theme", "dark");
 
-  // Load models
-  try {
-    const modelsRes = await fetch("/api/llm/models");
-    if (modelsRes.ok) {
-      const { models } = await modelsRes.json();
-      const sel = document.getElementById("llm-model");
-      models.forEach(m => {
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.name;
-        sel.appendChild(opt);
-      });
-    }
-  } catch { /* ignore */ }
-
-  // Load current settings
+  // Load current settings first so we know the saved provider before populating models
+  let savedProvider = "groq";
+  let savedModel = "";
   try {
     const res = await fetch("/api/settings");
     if (!res.ok) { window.location.href = "/login"; return; }
     const data = await res.json();
 
-    document.getElementById("llm-provider").value = data.llmConfig.provider || "groq";
-    document.getElementById("llm-model").value = data.llmConfig.model || "";
+    savedProvider = data.llmConfig.provider || "groq";
+    savedModel = data.llmConfig.model || "";
+    document.getElementById("llm-provider").value = savedProvider;
 
     if (data.llmConfig.hasKey) {
       document.getElementById("llm-key-badge").style.display = "";
@@ -60,7 +48,35 @@ function showToast(msg, type = "success") {
   } catch {
     showToast("Failed to load settings.", "error");
   }
+
+  // Load models for the saved provider, then restore saved model selection
+  await loadModels(savedProvider);
+  document.getElementById("llm-model").value = savedModel;
 })();
+
+// ── Model loading ─────────────────────────────────────────────────────────────
+
+async function loadModels(provider) {
+  try {
+    const modelsRes = await fetch(`/api/llm/models?provider=${encodeURIComponent(provider)}`);
+    if (!modelsRes.ok) return;
+    const { models } = await modelsRes.json();
+    const sel = document.getElementById("llm-model");
+    sel.innerHTML = '<option value="">Provider default</option>';
+    models.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    });
+  } catch { /* ignore */ }
+}
+
+function onProviderChange() {
+  const provider = document.getElementById("llm-provider").value;
+  loadModels(provider);
+  document.getElementById("llm-model").value = "";
+}
 
 // ── Save handlers ─────────────────────────────────────────────────────────────
 

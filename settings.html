@@ -20,12 +20,13 @@
     <!-- LLM Provider -->
     <section class="settings-section">
       <h2 class="settings-section-title">AI Provider (LLM)</h2>
-      <p class="settings-desc">Optionally supply your own Groq API key. If empty, the shared system key is used.</p>
+      <p class="settings-desc">Optionally supply your own API key. If empty, the shared system key is used (Groq only).</p>
 
       <div class="form-row">
         <label class="settings-label">Provider</label>
-        <select id="llm-provider" class="settings-input">
+        <select id="llm-provider" class="settings-input" onchange="onProviderChange()">
           <option value="groq">Groq</option>
+          <option value="mistral">Mistral</option>
         </select>
       </div>
       <div class="form-row">

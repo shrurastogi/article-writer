@@ -11,10 +11,20 @@ const router = express.Router();
 const GROQ_MODELS = [
   { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile (default)" },
   { id: "llama-3.1-70b-versatile", name: "Llama 3.1 70B Versatile" },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B 32K" },
-  { id: "gemma2-9b-it", name: "Gemma 2 9B IT" },
+  { id: "llama-3.1-8b-instant",    name: "Llama 3.1 8B Instant" },
+  { id: "mixtral-8x7b-32768",      name: "Mixtral 8x7B 32K" },
+  { id: "gemma2-9b-it",            name: "Gemma 2 9B IT" },
 ];
+
+const MISTRAL_MODELS = [
+  { id: "mistral-large-latest", name: "Mistral Large (latest)" },
+  { id: "mistral-small-latest", name: "Mistral Small (latest)" },
+  { id: "open-mixtral-8x22b",   name: "Open Mixtral 8x22B" },
+  { id: "open-mixtral-8x7b",    name: "Open Mixtral 8x7B" },
+  { id: "open-mistral-7b",      name: "Mistral 7B" },
+];
+
+const PROVIDER_MODELS = { groq: GROQ_MODELS, mistral: MISTRAL_MODELS };
 
 // ── GET /api/settings ─────────────────────────────────────────────────────────
 
@@ -120,7 +130,9 @@ router.delete("/settings/ncbi-key", requireApiAuth, async (req, res) => {
 // ── GET /api/llm/models ───────────────────────────────────────────────────────
 
 router.get("/llm/models", requireApiAuth, (req, res) => {
-  res.json({ models: GROQ_MODELS });
+  const provider = req.query.provider || "groq";
+  const models = PROVIDER_MODELS[provider] || GROQ_MODELS;
+  res.json({ models });
 });
 
 module.exports = router;
