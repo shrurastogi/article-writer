@@ -28,7 +28,6 @@ function showToast(msg, type = "success") {
 
     savedProvider = data.llmConfig.provider || "groq";
     savedModel = data.llmConfig.model || "";
-    document.getElementById("llm-provider").value = savedProvider;
 
     if (data.llmConfig.hasKey) {
       document.getElementById("llm-key-badge").style.display = "";
@@ -49,7 +48,8 @@ function showToast(msg, type = "success") {
     showToast("Failed to load settings.", "error");
   }
 
-  // Load models for the saved provider, then restore saved model selection
+  // Initialize provider card UI, load models, then restore saved model selection
+  selectProvider(savedProvider);
   await loadModels(savedProvider);
   document.getElementById("llm-model").value = savedModel;
 })();
@@ -72,8 +72,20 @@ async function loadModels(provider) {
   } catch { /* ignore */ }
 }
 
-function onProviderChange() {
-  const provider = document.getElementById("llm-provider").value;
+// ── Provider selection ────────────────────────────────────────────────────────
+
+const PROVIDER_META = {
+  groq:    { keyPlaceholder: "gsk_••••••••••••••••••", keyHint: 'Free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a>' },
+  mistral: { keyPlaceholder: "••••••••••••••••••••••••••••••••", keyHint: 'Free tier at <a href="https://console.mistral.ai" target="_blank">console.mistral.ai</a>' },
+  openai:  { keyPlaceholder: "sk-proj-••••••••••••••••", keyHint: 'Paid API at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>' },
+};
+
+function selectProvider(provider) {
+  document.getElementById("llm-provider").value = provider;
+  document.querySelectorAll(".provider-card").forEach(c => c.classList.toggle("selected", c.dataset.provider === provider));
+  const meta = PROVIDER_META[provider] || PROVIDER_META.groq;
+  document.getElementById("llm-api-key").placeholder = meta.keyPlaceholder;
+  document.getElementById("provider-key-hint").innerHTML = meta.keyHint;
   loadModels(provider);
   document.getElementById("llm-model").value = "";
 }

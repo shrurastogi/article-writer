@@ -6,6 +6,7 @@ const { decrypt } = require("./encryptionService");
 const PROVIDER_CONFIG = {
   groq:    { baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile" },
   mistral: { baseURL: "https://api.mistral.ai/v1",       defaultModel: "mistral-large-latest" },
+  openai:  { baseURL: "https://api.openai.com/v1",       defaultModel: "gpt-4o-mini" },
 };
 
 const MODEL = PROVIDER_CONFIG.groq.defaultModel; // kept for backward compat
@@ -18,8 +19,9 @@ const GROQ_KEYS = [
   process.env.GROQ_API_KEY_4,
 ].filter(Boolean);
 
-// Mistral system key — optional; BYOK users supply their own via Settings
+// System keys for non-Groq providers — optional; BYOK users supply their own via Settings
 const MISTRAL_KEY = process.env.MISTRAL_API_KEY || null;
+const OPENAI_KEY  = process.env.OPENAI_API_KEY  || null;
 
 let _keyIndex = 0;
 
@@ -67,13 +69,16 @@ async function createCompletionForUser(params, user) {
     try { key = decrypt(user.llmConfig.encryptedApiKey); } catch { /* fall through */ }
   }
 
-  if (!key && provider === "mistral") {
-    if (!MISTRAL_KEY) {
-      const err = new Error("No Mistral API key configured. Add MISTRAL_API_KEY to your environment or set a key in Settings.");
+  if (!key) {
+    const systemKeys = { mistral: MISTRAL_KEY, openai: OPENAI_KEY };
+    const sysKey = systemKeys[provider];
+    if (sysKey) {
+      key = sysKey;
+    } else if (provider !== "groq") {
+      const err = new Error(`No ${provider} API key configured. Add a key in Settings or contact your administrator.`);
       err.status = 503;
       throw err;
     }
-    key = MISTRAL_KEY;
   }
 
   if (!key) {

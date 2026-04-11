@@ -24,7 +24,14 @@ const MISTRAL_MODELS = [
   { id: "open-mistral-7b",      name: "Mistral 7B" },
 ];
 
-const PROVIDER_MODELS = { groq: GROQ_MODELS, mistral: MISTRAL_MODELS };
+const OPENAI_MODELS = [
+  { id: "gpt-4o",          name: "GPT-4o" },
+  { id: "gpt-4o-mini",     name: "GPT-4o mini (default)" },
+  { id: "gpt-4-turbo",     name: "GPT-4 Turbo" },
+  { id: "gpt-3.5-turbo",   name: "GPT-3.5 Turbo" },
+];
+
+const PROVIDER_MODELS = { groq: GROQ_MODELS, mistral: MISTRAL_MODELS, openai: OPENAI_MODELS };
 
 // ── GET /api/settings ─────────────────────────────────────────────────────────
 
