@@ -6,7 +6,8 @@ const logger = require("../utils/logger");
 
 // Search PubMed for relevant abstracts
 router.post("/pubmed-search", async (req, res) => {
-  const { query, maxResults = 8 } = req.body;
+  const { query, maxResults = 20 } = req.body;
+  const clampedMax = Math.min(Math.max(1, parseInt(maxResults, 10) || 20), 50);
 
   if (!query?.trim()) {
     return res.status(400).json({ error: "No search query provided." });
@@ -18,7 +19,7 @@ router.post("/pubmed-search", async (req, res) => {
     const searchUrl =
       `${NCBI_BASE}/esearch.fcgi?db=pubmed` +
       `&term=${encodeURIComponent(query.trim())}` +
-      `&retmax=${maxResults}&sort=relevance&retmode=json${keyParam}`;
+      `&retmax=${clampedMax}&sort=relevance&retmode=json${keyParam}`;
 
     const searchResp = await fetchWithRetry(searchUrl);
     if (!searchResp.ok) throw new Error(`PubMed search HTTP ${searchResp.status}`);

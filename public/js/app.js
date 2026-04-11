@@ -1368,7 +1368,7 @@ async function searchPubMed() {
     const resp = await fetch("/api/pubmed-search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, maxResults: 10 }),
+      body: JSON.stringify({ query, maxResults: 20 }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
     const data = await resp.json();
