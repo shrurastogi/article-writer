@@ -8,7 +8,6 @@ jobs:
   deploy:
     name: Deploy to Railway Dev
     runs-on: ubuntu-latest
-    environment: dev
 
     steps:
       - uses: actions/checkout@v4
@@ -16,8 +15,12 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway dev
-        run: railway up --service article-writer-dev --detach
+      - name: Set BUILD_SHA in Railway
+        run: railway variables --set "BUILD_SHA=${{ github.sha }}"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_DEV }}
-          BUILD_SHA: ${{ github.sha }}
+
+      - name: Deploy to Railway dev
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_DEV }}

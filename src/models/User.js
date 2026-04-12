@@ -6,6 +6,20 @@ const userSchema = new mongoose.Schema({
   name:         { type: String, required: true, trim: true },
   avatarUrl:    { type: String, default: "" },
   passwordHash: { type: String, default: null },
+  llmConfig: {
+    provider:        { type: String, default: "groq" },
+    model:           { type: String, default: "" },
+    encryptedApiKey: { type: String, default: "" },
+  },
+  researchConfig: {
+    encryptedNcbiKey: { type: String, default: "" },
+  },
+  preferences: {
+    theme:      { type: String, default: "light" },
+    fontSize:   { type: Number, default: 14 },
+    language:   { type: String, default: "English" },
+    strictMode: { type: Boolean, default: false },
+  },
   createdAt:    { type: Date, default: Date.now },
 });
 
@@ -16,6 +30,12 @@ userSchema.methods.toSafeObject = function () {
     name: this.name,
     email: this.email,
     avatarUrl: this.avatarUrl,
+    preferences: this.preferences ? {
+      theme: this.preferences.theme,
+      fontSize: this.preferences.fontSize,
+      language: this.preferences.language,
+      strictMode: this.preferences.strictMode,
+    } : undefined,
   };
 };
 

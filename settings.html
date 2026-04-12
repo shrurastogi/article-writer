@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Medical Article Writer</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/settings.css" />
+</head>
+<body>
+  <header class="settings-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="/dashboard" class="settings-back">← Dashboard</a>
+      <span class="settings-header-title">Settings</span>
+    </div>
+  </header>
+
+  <main class="settings-main">
+
+    <!-- LLM Provider -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">AI Provider</h2>
+      <p class="settings-desc">Pick a provider, choose a model, and optionally paste your own API key for higher rate limits. Without a personal key, the shared system key is used (Groq only).</p>
+
+      <!-- Provider cards -->
+      <div class="provider-cards" id="provider-cards">
+        <button class="provider-card" data-provider="groq" onclick="selectProvider('groq')">
+          <span class="provider-card-name">Groq</span>
+          <span class="provider-card-tag">Free · Ultra-fast</span>
+        </button>
+        <button class="provider-card" data-provider="mistral" onclick="selectProvider('mistral')">
+          <span class="provider-card-name">Mistral</span>
+          <span class="provider-card-tag">Free tier</span>
+        </button>
+        <button class="provider-card" data-provider="openai" onclick="selectProvider('openai')">
+          <span class="provider-card-name">OpenAI</span>
+          <span class="provider-card-tag">GPT-4o · Paid</span>
+        </button>
+      </div>
+
+      <!-- Hidden value field — read by saveLlmSettings() -->
+      <input type="hidden" id="llm-provider" value="groq" />
+
+      <!-- Model -->
+      <div class="form-row">
+        <label class="settings-label">Model</label>
+        <select id="llm-model" class="settings-input">
+          <option value="">Provider default</option>
+        </select>
+      </div>
+
+      <!-- API Key -->
+      <div class="form-row">
+        <label class="settings-label">API Key</label>
+        <input id="llm-api-key" type="password" class="settings-input" placeholder="" autocomplete="new-password" />
+        <span id="llm-key-badge" class="key-badge" style="display:none">Key saved</span>
+      </div>
+      <p id="provider-key-hint" class="provider-key-hint"></p>
+
+      <div class="settings-actions">
+        <button class="btn btn-sm btn-ai" onclick="saveLlmSettings()">Save</button>
+        <button class="btn btn-sm btn-outline" id="delete-llm-key-btn" onclick="deleteLlmKey()" style="display:none">Remove Key</button>
+      </div>
+    </section>
+
+    <!-- Research (NCBI) -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">Research API (NCBI PubMed)</h2>
+      <p class="settings-desc">Optional NCBI Entrez API key for higher PubMed request limits.</p>
+
+      <div class="form-row">
+        <label class="settings-label">NCBI API Key</label>
+        <input id="ncbi-api-key" type="password" class="settings-input" placeholder="Enter NCBI API key…" autocomplete="new-password" />
+        <span id="ncbi-key-badge" class="key-badge" style="display:none">Key saved</span>
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-sm btn-ai" onclick="saveNcbiSettings()">Save NCBI Key</button>
+        <button class="btn btn-sm btn-outline" id="delete-ncbi-key-btn" onclick="deleteNcbiKey()" style="display:none">Remove Key</button>
+      </div>
+    </section>
+
+    <!-- UI Preferences -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">UI Preferences</h2>
+
+      <div class="form-row">
+        <label class="settings-label">Theme</label>
+        <select id="pref-theme" class="settings-input">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="settings-label">Font Size</label>
+        <select id="pref-font-size" class="settings-input">
+          <option value="12">12px</option>
+          <option value="13">13px</option>
+          <option value="14" selected>14px (default)</option>
+          <option value="15">15px</option>
+          <option value="16">16px</option>
+          <option value="17">17px</option>
+          <option value="18">18px</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="settings-label">Default Language</label>
+        <select id="pref-language" class="settings-input">
+          <option value="English">English</option>
+          <option value="Spanish">Spanish</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Italian">Italian</option>
+          <option value="Portuguese">Portuguese</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Mandarin Chinese">Mandarin Chinese</option>
+          <option value="Arabic">Arabic</option>
+        </select>
+      </div>
+      <div class="form-row" style="align-items:center;gap:10px">
+        <span class="settings-label" aria-hidden="true"></span>
+        <input type="checkbox" id="pref-strict-mode" style="width:auto;margin:0" />
+        <label for="pref-strict-mode" style="margin:0;font-size:0.82rem;color:var(--secondary,#6b6b6b)">Strict mode — require references for AI generation</label>
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-sm btn-ai" onclick="savePreferences()">Save Preferences</button>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="settings-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#166534;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;display:none;z-index:9999"></div>
+
+  <script src="/js/settings.js"></script>
+</body>
+</html>

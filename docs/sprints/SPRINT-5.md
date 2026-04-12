@@ -1,7 +1,7 @@
 # Sprint 5 — Dashboard & Editor Enhancements
 
-**Status:** Planned  
-**Dates:** TBD  
+**Status:** ✅ Complete  
+**Dates:** 2026-04-05  
 **Priority tier:** Medium  
 **Renumbered from:** Sprint 3 (was SPRINT-3.md)
 

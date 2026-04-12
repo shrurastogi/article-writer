@@ -145,6 +145,151 @@ Permanently delete an article.
 **Response:** `204 No Content`.  
 **Errors:** `403 FORBIDDEN`; `404 NOT_FOUND`.
 
+### POST /api/articles/:id/clone
+Deep-copy an article owned by the authenticated user. The clone gets `"Copy of …"` prepended to its title.
+
+**Response:** `201 Created`
+```json
+{ "article": { "_id": "...", "title": "Copy of My Article", ... } }
+```
+**Errors:** `403 FORBIDDEN`; `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/lock
+Lock an article (owner only). Locked articles return `423 Locked` on PUT attempts.
+
+**Response:** `200 OK` `{ "isLocked": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/unlock
+Unlock a previously locked article (owner only).
+
+**Response:** `200 OK` `{ "isLocked": false }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/share
+Generate a public share token for the article (idempotent — returns existing token if already set).
+
+**Response:** `200 OK` `{ "shareToken": "uuid", "url": "/share/uuid" }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### DELETE /api/articles/:id/share
+Revoke the public share token.
+
+**Response:** `200 OK` `{ "revoked": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/collaborators
+Invite a registered user as a collaborator.
+
+**Body:** `{ "email": "user@example.com", "role": "viewer" | "editor" }`  
+**Response:** `200 OK` `{ "collaborators": [...] }`  
+**Errors:** `400 BAD_REQUEST`; `404 NOT_FOUND` (article or user).
+
+---
+
+### DELETE /api/articles/:id/collaborators/:uid
+Remove a collaborator by their user ID.
+
+**Response:** `200 OK` `{ "collaborators": [...] }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### GET /api/share/:token
+Public endpoint (no auth). Returns article data for read-only preview.
+
+**Response:** `200 OK` `{ "title", "topic", "sections", "authors", "wordCount", "language" }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+## Article Versioning
+
+### GET /api/articles/:id/versions
+List saved versions for an article (no snapshot content — metadata only).
+
+**Response:** `200 OK` `{ "versions": [{ "_id", "label", "wordCount", "createdAt" }, ...] }`  
+**Errors:** `401 UNAUTHORIZED`.
+
+---
+
+### POST /api/articles/:id/versions
+Create a snapshot of the article's current sections. Oldest versions deleted when cap of 50 is exceeded.
+
+**Body:** `{ "label": "string (optional)" }`  
+**Response:** `201 Created` `{ "version": { "_id", "label", "wordCount", "createdAt" } }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### POST /api/articles/:id/versions/:vid/restore
+Restore a version. Saves current state as a new "Before restore" version first.
+
+**Response:** `200 OK` `{ "restored": true }`  
+**Errors:** `404 NOT_FOUND`.
+
+---
+
+### DELETE /api/articles/:id/versions/:vid
+Delete a version.
+
+**Response:** `200 OK` `{ "deleted": true }`
+
+---
+
+## Settings
+
+### GET /api/settings
+Return current user settings (no encrypted values returned).
+
+**Response:** `200 OK`
+```json
+{
+  "llmConfig": { "provider": "groq", "model": "", "hasKey": false },
+  "researchConfig": { "hasNcbiKey": false },
+  "preferences": { "theme": "light", "fontSize": 14, "language": "English", "strictMode": false }
+}
+```
+
+---
+
+### PUT /api/settings
+Update LLM provider/model/apiKey, NCBI key, or UI preferences. Only provided fields are updated.
+
+**Body:** `{ "provider", "model", "apiKey", "ncbiKey", "preferences": { "theme", "fontSize", "language", "strictMode" } }`  
+**Response:** `200 OK` — same shape as GET /api/settings
+
+---
+
+### DELETE /api/settings/llm-key
+Remove the stored LLM API key (falls back to system key).
+
+**Response:** `200 OK` `{ "hasKey": false }`
+
+---
+
+### DELETE /api/settings/ncbi-key
+Remove the stored NCBI API key.
+
+**Response:** `200 OK` `{ "hasNcbiKey": false }`
+
+---
+
+### GET /api/llm/models
+List available LLM models for the Groq provider.
+
+**Response:** `200 OK` `{ "models": [{ "id": "llama-3.3-70b-versatile", "name": "..." }, ...] }`
+
 ---
 
 ## Utility
@@ -286,6 +431,75 @@ Review the full article for flow and narrative consistency.
 }
 ```
 **Response:** `text/plain` stream with structured analysis (Overall Assessment, Section Flow, Issues, Recommendations).
+**Errors:** `400` missing topic or empty sections array.
+
+---
+
+### POST /api/coherence-fix
+Context-aware rewrite of a single section to resolve a specific flow issue identified by `/api/coherence-check`. Receives adjacent section content so the AI can ensure smooth transitions to and from neighbouring sections.
+
+**Request**
+```json
+{
+  "topic": "string (required)",
+  "sectionTitle": "string (required)",
+  "currentDraft": "string (required) — current prose of the section to fix",
+  "recommendation": "string (required) — the specific flow issue or instruction to address",
+  "prevSection": {
+    "title": "string",
+    "prose": "string"
+  },
+  "nextSection": {
+    "title": "string",
+    "prose": "string"
+  },
+  "language": "string (optional, default: English)",
+  "writingStyle": "string (optional)"
+}
+```
+`prevSection` and `nextSection` are optional. When provided, the last 400 chars of `prevSection.prose` and the first 400 chars of `nextSection.prose` are used as context. The AI returns only the revised section text — no commentary.
+
+**Response:** `text/plain` stream of the rewritten section prose.  
+**Errors:** `400` missing topic, currentDraft, or recommendation.
+
+---
+
+### POST /api/grammar-check
+Check a section for grammar and style issues (passive voice, long sentences, informal language, hedging).
+
+**Request**
+```json
+{
+  "content": "string (required)",
+  "topic": "string (optional)",
+  "sectionTitle": "string (optional)",
+  "language": "string (optional, default: English)"
+}
+```
+**Response:** `text/plain` stream. Each issue on its own line: `ISSUE | TYPE | fragment | suggestion`. Returns `NO_ISSUES` if none found.
+**Errors:** `400` missing content.
+
+---
+
+### POST /api/agent/draft
+Generate full article drafts for all sections in one request (SSE stream).
+
+**Request**
+```json
+{
+  "topic": "string (required)",
+  "sections": [
+    { "id": "string", "title": "string", "notes": "string", "userContext": "string" }
+  ],
+  "language": "string (optional)",
+  "pubmedContext": "string (optional)"
+}
+```
+**Response:** `text/event-stream`. Events:
+- `{ type: "section_start", id, title }` — generation began for this section
+- `{ type: "section_done", id, title, content }` — section draft ready
+- `{ type: "complete" }` — all sections done
+- `{ type: "error", message }` — generation failed
 **Errors:** `400` missing topic or empty sections array.
 
 ---

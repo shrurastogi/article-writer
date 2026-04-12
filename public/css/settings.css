@@ -1,0 +1,36 @@
+/* ── Settings Page ── */
+body { background: var(--bg, #faf8f5); color: var(--text, #1a1a1a); font-family: 'Inter', system-ui, sans-serif; margin: 0; }
+
+.settings-header { background: var(--primary, #e87722); color: #fff; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+.settings-back { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.88rem; }
+.settings-back:hover { color: #fff; }
+.settings-header-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
+
+.settings-main { max-width: 640px; margin: 32px auto; padding: 0 20px; }
+
+.settings-section { background: #fff; border: 1px solid var(--border, #e5e5e5); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+.settings-section-title { font-size: 1rem; font-weight: 700; color: var(--text, #1a1a1a); margin: 0 0 6px; }
+.settings-desc { font-size: 0.82rem; color: var(--secondary, #6b6b6b); margin: 0 0 16px; }
+
+.form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.settings-label { font-size: 0.82rem; font-weight: 600; color: var(--secondary, #6b6b6b); width: 110px; flex-shrink: 0; }
+.settings-input { flex: 1; min-width: 180px; border: 1px solid var(--border, #e5e5e5); border-radius: 6px; padding: 7px 10px; font-size: 0.85rem; font-family: inherit; color: var(--text, #1a1a1a); background: var(--bg, #faf8f5); }
+.settings-input:focus { outline: none; border-color: var(--primary, #e87722); }
+
+.key-badge { background: #dcfce7; color: #166534; border-radius: 20px; padding: 2px 8px; font-size: 0.73rem; font-weight: 600; }
+.settings-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+[data-theme="dark"] .settings-section { background: var(--surface, #1e1e1e); border-color: var(--border, #333); }
+[data-theme="dark"] .settings-input { background: var(--surface, #1e1e1e); color: var(--text, #f0f0f0); border-color: var(--border, #333); }
+
+.provider-cards { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.provider-card { flex: 1; min-width: 100px; border: 2px solid var(--border, #e5e5e5); border-radius: 10px; padding: 12px 10px; background: var(--bg, #faf8f5); cursor: pointer; text-align: center; transition: border-color 0.15s, background 0.15s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.provider-card:hover { border-color: var(--primary, #e87722); }
+.provider-card.selected { border-color: var(--primary, #e87722); background: #fff8f3; }
+.provider-card-name { font-weight: 700; font-size: 0.92rem; color: var(--text, #1a1a1a); }
+.provider-card-tag { font-size: 0.72rem; color: var(--secondary, #6b6b6b); }
+.provider-key-hint { font-size: 0.78rem; color: var(--secondary, #6b6b6b); margin: -4px 0 12px 120px; }
+.provider-key-hint a { color: var(--primary, #e87722); }
+
+[data-theme="dark"] .provider-card { background: var(--surface, #1e1e1e); }
+[data-theme="dark"] .provider-card.selected { background: #2a1f15; }

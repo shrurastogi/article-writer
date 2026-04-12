@@ -6,7 +6,7 @@
 
 const request = require("supertest");
 const mongoose = require("mongoose");
-const User = require("../../../models/user");
+const User = require("../../../src/models/User");
 
 process.env.NODE_ENV = "test";
 process.env.SESSION_SECRET = "test-secret";

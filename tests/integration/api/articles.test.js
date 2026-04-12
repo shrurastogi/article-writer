@@ -6,8 +6,8 @@
 
 const request = require("supertest");
 const mongoose = require("mongoose");
-const User = require("../../../models/user");
-const Article = require("../../../models/article");
+const User = require("../../../src/models/User");
+const Article = require("../../../src/models/Article");
 
 process.env.NODE_ENV = "test";
 process.env.SESSION_SECRET = "test-secret";
@@ -194,5 +194,75 @@ describe("DELETE /api/articles/:id", () => {
     const create = await agent1.post("/api/articles");
     const res = await agent2.delete(`/api/articles/${create.body.article._id}`);
     expect(res.status).toBe(403);
+  });
+});
+
+// ── POST /api/articles/:id/clone ──────────────────────────────────────────────
+
+describe("POST /api/articles/:id/clone", () => {
+  it("creates a copy with 'Copy of' prefix, new _id, same sections, returns 201", async () => {
+    const agent = await authenticatedAgent("clone-owner@example.com");
+    const create = await agent.post("/api/articles").send();
+    const id = create.body.article._id;
+    await agent.put(`/api/articles/${id}`).send({ title: "My Article", sections: { introduction: { prose: "Intro text." } } });
+
+    const res = await agent.post(`/api/articles/${id}/clone`);
+    expect(res.status).toBe(201);
+    expect(res.body.article._id).not.toBe(id);
+    expect(res.body.article.title).toBe("Copy of My Article");
+  });
+
+  it("returns 404 for a non-existent article", async () => {
+    const agent = await authenticatedAgent("clone-404@example.com");
+    const fakeId = new mongoose.Types.ObjectId();
+    const res = await agent.post(`/api/articles/${fakeId}/clone`);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when cloning another user's article", async () => {
+    const agent1 = await authenticatedAgent("clone-owner2@example.com");
+    const agent2 = await authenticatedAgent("clone-other@example.com");
+    const create = await agent1.post("/api/articles");
+    const res = await agent2.post(`/api/articles/${create.body.article._id}/clone`);
+    expect(res.status).toBe(403);
+  });
+});
+
+// ── POST /api/articles/:id/lock & /unlock ─────────────────────────────────────
+
+describe("POST /api/articles/:id/lock and /unlock", () => {
+  it("locks an article, then PUT returns 423", async () => {
+    const agent = await authenticatedAgent("lock-user@example.com");
+    const create = await agent.post("/api/articles");
+    const id = create.body.article._id;
+
+    const lockRes = await agent.post(`/api/articles/${id}/lock`);
+    expect(lockRes.status).toBe(200);
+    expect(lockRes.body.isLocked).toBe(true);
+
+    const putRes = await agent.put(`/api/articles/${id}`).send({ title: "Try to edit" });
+    expect(putRes.status).toBe(423);
+  });
+
+  it("unlock allows editing again", async () => {
+    const agent = await authenticatedAgent("unlock-user@example.com");
+    const create = await agent.post("/api/articles");
+    const id = create.body.article._id;
+
+    await agent.post(`/api/articles/${id}/lock`);
+    const unlockRes = await agent.post(`/api/articles/${id}/unlock`);
+    expect(unlockRes.status).toBe(200);
+    expect(unlockRes.body.isLocked).toBe(false);
+
+    const putRes = await agent.put(`/api/articles/${id}`).send({ title: "Now editable" });
+    expect(putRes.status).toBe(200);
+  });
+
+  it("returns 404 when locking another user's article", async () => {
+    const agent1 = await authenticatedAgent("lock-owner@example.com");
+    const agent2 = await authenticatedAgent("lock-other@example.com");
+    const create = await agent1.post("/api/articles");
+    const res = await agent2.post(`/api/articles/${create.body.article._id}/lock`);
+    expect(res.status).toBe(404);
   });
 });

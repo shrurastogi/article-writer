@@ -1,8 +1,10 @@
+"use strict";
+
 const express = require("express");
 const passport = require("passport");
 const bcrypt = require("bcrypt");
-const User = require("../models/user");
-const logger = require("../lib/logger");
+const User = require("../models/User");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 

@@ -8,7 +8,7 @@ const request = require("supertest");
 
 let app;
 beforeAll(() => {
-  app = require("../../../server");
+  app = require("../../../src/app");
 });
 
 describe("GET /api/version", () => {

@@ -2,8 +2,8 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const LocalStrategy = require("passport-local").Strategy;
 const bcrypt = require("bcrypt");
-const User = require("../models/user");
-const logger = require("./logger");
+const User = require("../models/User");
+const logger = require("../utils/logger");
 
 // ── Serialize / Deserialize ──────────────────────────────────────────────────
 
