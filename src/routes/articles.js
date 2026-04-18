@@ -71,12 +71,13 @@ router.put("/:id", async (req, res) => {
 
     if (article.isLocked) return res.status(423).json({ error: "Article is locked." });
 
-    const { title, topic, authors, keywords, sections, library, customSections, language, writingStyle } = req.body;
+    const { title, topic, authors, keywords, articleType, sections, library, customSections, language, writingStyle } = req.body;
 
     if (title !== undefined)         article.title = title;
     if (topic !== undefined)         article.topic = topic;
     if (authors !== undefined)       article.authors = authors;
     if (keywords !== undefined)      article.keywords = keywords;
+    if (articleType !== undefined)   article.articleType = articleType;
     if (sections !== undefined)      article.sections = sections;
     if (library !== undefined)       article.library = library;
     if (customSections !== undefined) article.customSections = customSections;

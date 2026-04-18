@@ -371,3 +371,11 @@
     .section-head-right { display:flex; align-items:center; gap:6px; }
     .btn-grammar-icon { background:none; border:none; cursor:pointer; font-size:0.9rem; opacity:0.45; transition:opacity 0.15s; padding:2px 4px; border-radius:4px; line-height:1; }
     .btn-grammar-icon:hover { opacity:1; background:var(--bg); }
+
+    /* ── Article Type Selector ── */
+    .article-type-selector { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .type-option { flex:1; display:flex; align-items:center; justify-content:center; padding:6px 10px; font-size:0.8rem; font-weight:500; cursor:pointer; border-right:1px solid var(--border); }
+    .type-option:last-child { border-right:none; }
+    .type-option input[type="radio"] { display:none; }
+    .type-option:has(input:checked) { background:var(--ai); color:#fff; }
+    .type-option:not(:has(input:checked)):hover { background:var(--ai-light); }

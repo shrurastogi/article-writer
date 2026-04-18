@@ -1,8 +1,8 @@
 "use strict";
 
-function getSectionContext(topic, sectionId, sectionTitle) {
+function getSectionContext(topic, sectionId, sectionTitle, articleType = "review") {
   const t = topic || "the given medical topic";
-  const map = {
+  const baseMap = {
     // Current standard sections (Sprint 2+)
     abstract:      `a structured abstract (Background, Key Findings, Conclusions) for a review article on ${t}`,
     introduction:  `an Introduction covering disease background, global burden, and rationale for reviewing ${t}`,
@@ -22,7 +22,21 @@ function getSectionContext(topic, sectionId, sectionTitle) {
     future_directions: `a Future Directions section covering ongoing trials, emerging targets, and unresolved research questions for ${t}`,
     conclusion:        `a Conclusions section summarising major advances, remaining challenges, and clinical implications for ${t}`,
   };
-  return map[sectionId] || `the "${sectionTitle}" section of a review article on ${t}`;
+  const overrides = {
+    original_research: {
+      abstract:     `a structured abstract (Background, Methods, Results, Conclusions) for an original research article on ${t}`,
+      introduction: `an Introduction identifying the gap in knowledge, study rationale, and primary aims for original research on ${t}`,
+      methods:      `a Methods section covering study design, participants, interventions, outcomes, and statistical analysis for ${t}`,
+      results:      `a Results section presenting primary and secondary outcomes with data, tables, and statistical results for ${t}`,
+    },
+    perspective: {
+      abstract:          `a brief abstract summarising the perspective argument on ${t}`,
+      introduction:      `an Introduction contextualising the clinical debate and author's viewpoint on ${t}`,
+      perspective_body:  `a Perspective body presenting the author's argument with supporting evidence and counter-arguments on ${t}`,
+    },
+  };
+  return overrides[articleType]?.[sectionId] || baseMap[sectionId]
+    || `the "${sectionTitle}" section of a medical article on ${t}`;
 }
 
 /**

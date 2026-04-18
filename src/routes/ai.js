@@ -9,14 +9,14 @@ const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language, writingStyle } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language, writingStyle, articleType, existingSections } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
   }
 
   const subject = topic.trim();
-  const context = getSectionContext(subject, sectionId, sectionTitle);
+  const context = getSectionContext(subject, sectionId, sectionTitle, articleType || "review");
   const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
   const litText = pubmedContext?.trim()
     ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
@@ -28,15 +28,20 @@ router.post("/generate", async (req, res) => {
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
   const styleText = getStyleInstruction(writingStyle);
+  const journalHint = { original_research: "NEJM, Lancet, JAMA", perspective: "NEJM Perspective, Lancet Comment, JAMA Viewpoint" }[articleType] || "Nat Rev / NEJM reviews, JCO Reviews";
+  const existingSectionsText = Array.isArray(existingSections) && existingSections.length
+    ? `\n\nContent already covered in other sections (do not repeat — cross-reference or build upon instead):\n` +
+      existingSections.filter(s => s.prose?.trim()).map(s => `- ${s.title}: ...${s.prose.trim().slice(-300)}`).join("\n")
+    : "";
 
   const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
-- Formal academic writing style suitable for a high-impact journal (e.g. NEJM, Lancet, JCO)
+- Formal academic writing style suitable for a high-impact journal (e.g. ${journalHint})
 - Evidence-based with citations as [Author et al., Year] placeholders
 - Comprehensive yet concise (300–600 words for most sections)
 - Include key statistics, landmark trial names, drug names, and current guidelines where applicable
-- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
+- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}${existingSectionsText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -559,7 +564,7 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 
 // One-click full article draft — SSE endpoint
 router.post("/agent/draft", async (req, res) => {
-  const { topic, sections, language, pubmedContext, writingStyle } = req.body;
+  const { topic, sections, language, pubmedContext, writingStyle, articleType } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -585,25 +590,31 @@ router.post("/agent/draft", async (req, res) => {
     : "";
 
   const styleText = getStyleInstruction(writingStyle);
+  const generatedSections = [];
+  const journalHint = { original_research: "NEJM, Lancet, JAMA", perspective: "NEJM Perspective, Lancet Comment" }[articleType] || "Nat Rev / NEJM reviews, JCO Reviews";
 
   try {
     for (const section of sections) {
       const { id, title, notes, userContext } = section;
       sendEvent({ type: "section_start", id, title });
 
-      const context = getSectionContext(subject, id, title);
+      const context = getSectionContext(subject, id, title, articleType || "review");
       const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
       const userContextText = userContext?.trim()
         ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+        : "";
+      const priorContextText = generatedSections.length
+        ? `\n\nPreviously generated sections (do not repeat these points — build upon them):\n` +
+          generatedSections.map(s => `- ${s.title}: ${s.prose.slice(0, 150)}…`).join("\n")
         : "";
 
       const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
-- Formal academic writing style suitable for a high-impact journal
+- Formal academic writing style suitable for a high-impact journal (e.g. ${journalHint})
 - Evidence-based with citations as [Author et al., Year] placeholders
 - Comprehensive yet concise (300–600 words for most sections)
-- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
+- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}${priorContextText}`;
 
       const stream = await createCompletionForUser({
         model: MODEL,
@@ -618,6 +629,7 @@ Requirements:
       }
 
       sendEvent({ type: "section_done", id, title, content });
+      generatedSections.push({ title, prose: content });
     }
 
     sendEvent({ type: "complete" });

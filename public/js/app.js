@@ -1,12 +1,34 @@
 // ── Section definitions ──
-let SECTIONS = [
-  { id: "abstract",     num: "",  title: "Abstract",     placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)...", isCustom: false },
-  { id: "introduction", num: "1", title: "Introduction", placeholder: "Disease background, clinical burden, rationale for the review...", isCustom: false },
-  { id: "main_body",    num: "2", title: "Main Body",    placeholder: "Use + Add Section to insert thematic subsections (e.g. Epidemiology, Pathophysiology, Diagnosis, Treatment).\n\nAlternatively write general overview content here...", isCustom: false },
-  { id: "discussion",   num: "3", title: "Discussion",   placeholder: "Synthesis of evidence, clinical implications, limitations, comparison with existing reviews...", isCustom: false },
-  { id: "conclusions",  num: "4", title: "Conclusions",  placeholder: "Summary of key findings, remaining challenges, future directions, clinical take-aways...", isCustom: false },
-  { id: "references",   num: "",  title: "References",   placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ...", isCustom: false },
-];
+const SECTIONS_BY_TYPE = {
+  review: [
+    { id: "abstract",     num: "",  title: "Abstract",     placeholder: "Structured abstract: Background, Key Findings, Conclusions (250–350 words)...", isCustom: false },
+    { id: "introduction", num: "1", title: "Introduction", placeholder: "Disease background, clinical burden, rationale for the review...", isCustom: false },
+    { id: "main_body",    num: "2", title: "Main Body",    placeholder: "Use + Add Section to insert thematic subsections (e.g. Epidemiology, Pathophysiology, Diagnosis, Treatment).\n\nAlternatively write general overview content here...", isCustom: false },
+    { id: "discussion",   num: "3", title: "Discussion",   placeholder: "Synthesis of evidence, clinical implications, limitations, comparison with existing reviews...", isCustom: false },
+    { id: "conclusions",  num: "4", title: "Conclusions",  placeholder: "Summary of key findings, remaining challenges, future directions, clinical take-aways...", isCustom: false },
+    { id: "references",   num: "",  title: "References",   placeholder: "1. Author A, et al. Title. Journal. Year;Vol:Pages.\n2. ...", isCustom: false },
+  ],
+  original_research: [
+    { id: "abstract",     num: "",  title: "Abstract",     placeholder: "Structured abstract: Background, Methods, Results, Conclusions...", isCustom: false },
+    { id: "introduction", num: "1", title: "Introduction", placeholder: "Background, gap in knowledge, study rationale and aims...", isCustom: false },
+    { id: "methods",      num: "2", title: "Methods",      placeholder: "Study design, participants, interventions, outcomes, statistical analysis...", isCustom: false },
+    { id: "results",      num: "3", title: "Results",      placeholder: "Primary and secondary outcomes, data, tables, statistical results...", isCustom: false },
+    { id: "discussion",   num: "4", title: "Discussion",   placeholder: "Interpretation, clinical implications, limitations, comparison with literature...", isCustom: false },
+    { id: "conclusions",  num: "5", title: "Conclusions",  placeholder: "Summary of key findings, implications, future directions...", isCustom: false },
+    { id: "references",   num: "",  title: "References",   placeholder: "1. Author A, et al. ...", isCustom: false },
+  ],
+  perspective: [
+    { id: "abstract",         num: "",  title: "Abstract",     placeholder: "Brief abstract summarising the perspective argument...", isCustom: false },
+    { id: "introduction",     num: "1", title: "Introduction", placeholder: "Context for the debate and the author's viewpoint...", isCustom: false },
+    { id: "perspective_body", num: "2", title: "Perspective",  placeholder: "The argument with supporting evidence and the author's viewpoint...", isCustom: false },
+    { id: "conclusions",      num: "3", title: "Conclusions",  placeholder: "Summary and clinical/policy implications...", isCustom: false },
+    { id: "references",       num: "",  title: "References",   placeholder: "1. Author A, et al. ...", isCustom: false },
+  ],
+};
+function getSectionsForType(type) {
+  return (SECTIONS_BY_TYPE[type] || SECTIONS_BY_TYPE.review).map(s => ({ ...s }));
+}
+let SECTIONS = getSectionsForType("review");
 
 // Legacy section IDs for articles created before the Sprint 2 section restructure.
 // Used in applyArticleData to migrate old content into custom sections.
@@ -24,6 +46,7 @@ const LEGACY_TITLES = {
 
 // ── State ──
 const state = {
+  articleType: "review",
   sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [] }])),
   library: [],  // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, refNumber, selected }]
   writingStyle: null, // { sampleText, styleProfile, calibratedAt } — set via Calibrate button
@@ -461,7 +484,10 @@ function generateDraft(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "✨ Generated Draft", true, warn);
+  const existingSections = SECTIONS
+    .filter(s => s.id !== id && state.sections[s.id]?.prose?.trim())
+    .map(s => ({ title: s.title, prose: state.sections[s.id].prose }));
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, articleType: state.articleType, existingSections }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
@@ -911,6 +937,7 @@ function scheduleAutoSave() {
       title: document.getElementById("article-title").value,
       authors: document.getElementById("authors").value,
       keywords: document.getElementById("keywords").value,
+      articleType: state.articleType,
       sections: state.sections,
       library: state.library,
       customSections: SECTIONS.filter(s => s.isCustom),
@@ -937,6 +964,21 @@ function scheduleAutoSave() {
   }, 1500);
 }
 
+function onArticleTypeChange(newType) {
+  if (newType === state.articleType) return;
+  const prevProse = {};
+  SECTIONS.forEach(s => { prevProse[s.id] = state.sections[s.id]; });
+  state.articleType = newType;
+  SECTIONS = getSectionsForType(newType);
+  const newSections = {};
+  SECTIONS.forEach(s => { newSections[s.id] = prevProse[s.id] || { prose: "", tables: [], userContext: "" }; });
+  state.sections = newSections;
+  renumberSections();
+  renderSections();
+  updatePreview();
+  scheduleAutoSave();
+}
+
 // ── Article Versioning ────────────────────────────────────────────────────────
 
 // Ensures article exists on server. If not, creates it and updates URL.
@@ -952,6 +994,7 @@ async function ensureArticleSaved() {
       title: document.getElementById("article-title").value,
       authors: document.getElementById("authors").value,
       keywords: document.getElementById("keywords").value,
+      articleType: state.articleType,
       sections: state.sections,
       library: state.library,
       customSections: SECTIONS.filter(s => s.isCustom),
@@ -1223,6 +1266,13 @@ function applyArticleData(data) {
     if (sel) sel.value = data.language;
   }
 
+  if (data.articleType && data.articleType !== state.articleType) {
+    state.articleType = data.articleType;
+    const btn = document.querySelector(`input[name="article-type"][value="${data.articleType}"]`);
+    if (btn) btn.checked = true;
+    SECTIONS = getSectionsForType(data.articleType);
+  }
+
   // Restore previously saved custom sections
   if (data.customSections?.length) {
     const refIdx = SECTIONS.findIndex(s => s.id === "references");
@@ -1332,8 +1382,11 @@ function clearAll() {
   document.getElementById("article-title").value = "";
   document.getElementById("authors").value = "";
   document.getElementById("keywords").value = "";
-  // Remove custom sections
-  SECTIONS = SECTIONS.filter(s => !s.isCustom);
+  // Reset article type to review
+  SECTIONS = getSectionsForType("review");
+  state.articleType = "review";
+  const reviewBtn = document.querySelector('input[name="article-type"][value="review"]');
+  if (reviewBtn) reviewBtn.checked = true;
   SECTIONS.forEach(s => {
     state.sections[s.id] = { prose: "", tables: [] };
     const el = document.getElementById(`content-${s.id}`);
@@ -1894,6 +1947,7 @@ async function startFullDraft() {
         language: getLanguage(),
         pubmedContext: getSelectedPubmedContext(),
         writingStyle: state.writingStyle,
+        articleType: state.articleType,
       }),
       signal: draftAbortController.signal,
     });

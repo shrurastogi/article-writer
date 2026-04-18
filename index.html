@@ -65,6 +65,14 @@
           <label>Keywords <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label>
           <input type="text" id="keywords" placeholder="Multiple myeloma, plasma cell disorder, IMiD, proteasome inhibitor, CAR-T, bispecific antibody" oninput="updateMeta()" />
         </div>
+        <div class="form-group">
+          <label>Article Type</label>
+          <div class="article-type-selector" role="group">
+            <label class="type-option"><input type="radio" name="article-type" value="review" checked onchange="onArticleTypeChange(this.value)"><span>Review Article</span></label>
+            <label class="type-option"><input type="radio" name="article-type" value="original_research" onchange="onArticleTypeChange(this.value)"><span>Original Research</span></label>
+            <label class="type-option"><input type="radio" name="article-type" value="perspective" onchange="onArticleTypeChange(this.value)"><span>Perspective</span></label>
+          </div>
+        </div>
         <div class="form-group" style="margin-bottom:0">
           <label>Output Language</label>
           <select id="language-select" onchange="updateMeta()">
