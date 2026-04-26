@@ -8,7 +8,7 @@ process.on("uncaughtException", (err) => {
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[CRASH] unhandledRejection:", reason?.stack || reason);
-  process.exit(1);
+  // Do not exit — log only. A DB auth failure should not kill the whole process.
 });
 
 console.log("[STARTUP] Loading app module...");
