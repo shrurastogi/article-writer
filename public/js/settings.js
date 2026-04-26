@@ -1,5 +1,107 @@
 "use strict";
 
+// ── Writing Style Presets ─────────────────────────────────────────────────────
+
+const WRITING_STYLE_PRESETS = [
+  {
+    id: "none",
+    name: "None",
+    tagline: "AI default",
+    desc: "No style guidance applied. The AI uses its default academic writing voice.",
+    styleProfile: null,
+  },
+  {
+    id: "clinical_formal",
+    name: "Clinical & Formal",
+    tagline: "Dense · High hedging",
+    desc: "Dense, precise academic prose with long complex sentences and high hedging. Passive voice used where conventionally expected. Best for high-impact journals such as NEJM, Lancet, JAMA, and JCO.",
+    styleProfile: { toneDescriptor: "formal, precise, clinical", formalityScore: 90, avgSentenceLength: 28, hedgingFrequency: "high" },
+  },
+  {
+    id: "clear_accessible",
+    name: "Clear & Accessible",
+    tagline: "Readable · Active voice",
+    desc: "Formal but reader-friendly. Shorter sentences, active voice preferred, technical terms explained on first use. Best for review articles and clinical education targeting clinicians and trainees.",
+    styleProfile: { toneDescriptor: "formal yet accessible, reader-friendly", formalityScore: 70, avgSentenceLength: 20, hedgingFrequency: "moderate" },
+  },
+  {
+    id: "concise_direct",
+    name: "Concise & Direct",
+    tagline: "Tight · Minimal hedging",
+    desc: "Tight, economical writing with short sentences, minimal hedging, and active voice throughout. Best for editorials, perspectives, and brief communications where every word counts.",
+    styleProfile: { toneDescriptor: "concise, direct, economical", formalityScore: 75, avgSentenceLength: 15, hedgingFrequency: "low" },
+  },
+  {
+    id: "evidence_led",
+    name: "Evidence-Led",
+    tagline: "Data-forward · Quantitative",
+    desc: "Leads with statistics and trial outcomes, integrates citations tightly, uses precise quantitative language throughout. Best for systematic reviews, meta-analyses, and HTA submissions.",
+    styleProfile: { toneDescriptor: "data-forward, quantitative, citation-dense", formalityScore: 85, avgSentenceLength: 22, hedgingFrequency: "moderate" },
+  },
+  {
+    id: "narrative_engaging",
+    name: "Narrative & Engaging",
+    tagline: "Story-driven · Smooth flow",
+    desc: "Story-driven flow with smooth transitions, analogies, and progressive argument-building. Best for educational reviews, grand rounds presentations, and CME materials.",
+    styleProfile: { toneDescriptor: "narrative, engaging, progressive", formalityScore: 65, avgSentenceLength: 18, hedgingFrequency: "low" },
+  },
+  {
+    id: "guideline_style",
+    name: "Guideline Style",
+    tagline: "Structured · Prescriptive",
+    desc: "Structured, prescriptive writing with clear numbered recommendations and imperative phrasing. Best for consensus statements, clinical practice guidelines, and position papers.",
+    styleProfile: { toneDescriptor: "structured, prescriptive, recommendation-led", formalityScore: 88, avgSentenceLength: 16, hedgingFrequency: "low" },
+  },
+];
+
+let selectedStylePreset = "none";
+
+function renderStylePresets(savedPreset) {
+  const grid = document.getElementById("style-preset-grid");
+  if (!grid) return;
+  grid.innerHTML = WRITING_STYLE_PRESETS.map(p => `
+    <button class="style-preset-card${p.id === savedPreset ? " selected" : ""}"
+            data-preset-id="${p.id}"
+            onclick="selectStylePreset('${p.id}')" type="button">
+      <span class="style-preset-name">${p.name}</span>
+      <span class="style-preset-tagline">${p.tagline}</span>
+    </button>
+  `).join("");
+  selectedStylePreset = savedPreset || "none";
+  updateStyleDesc(selectedStylePreset);
+}
+
+function selectStylePreset(id) {
+  selectedStylePreset = id;
+  document.querySelectorAll(".style-preset-card").forEach(c => {
+    c.classList.toggle("selected", c.dataset.presetId === id);
+  });
+  updateStyleDesc(id);
+}
+
+function updateStyleDesc(id) {
+  const desc = document.getElementById("style-preset-desc");
+  if (!desc) return;
+  const preset = WRITING_STYLE_PRESETS.find(p => p.id === id);
+  if (!preset || !preset.desc) { desc.classList.remove("visible"); return; }
+  desc.textContent = preset.desc;
+  desc.classList.add("visible");
+}
+
+async function saveWritingStyle() {
+  try {
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferences: { writingStylePreset: selectedStylePreset } }),
+    });
+    if (!res.ok) throw new Error("Failed");
+    showToast("Writing style saved.");
+  } catch {
+    showToast("Failed to save writing style.", "error");
+  }
+}
+
 // ── Toast ──────────────────────────────────────────────────────────────────────
 
 function showToast(msg, type = "success") {
@@ -44,6 +146,7 @@ function showToast(msg, type = "success") {
     document.getElementById("pref-font-size").value = String(p.fontSize || 14);
     document.getElementById("pref-language").value = p.language || "English";
     document.getElementById("pref-strict-mode").checked = !!p.strictMode;
+    renderStylePresets(p.writingStylePreset || "none");
   } catch {
     showToast("Failed to load settings.", "error");
   }

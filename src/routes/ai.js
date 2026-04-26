@@ -9,7 +9,7 @@ const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language, writingStyle, articleType, existingSections, prevSection, nextSection } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, language, writingStyle, articleType, existingSections, prevSection, nextSection } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -17,9 +17,8 @@ router.post("/generate", async (req, res) => {
 
   const subject = topic.trim();
   const context = getSectionContext(subject, sectionId, sectionTitle, articleType || "review");
-  const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
-  const userContextText = userContext?.trim()
-    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+  const notesText = notes?.trim()
+    ? `\n\nKey points and data the author wants to cover (treat any statistics or trial data as authoritative):\n${notes}`
     : "";
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
@@ -57,7 +56,7 @@ router.post("/generate", async (req, res) => {
   const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
-${allRequirements.map(r => `- ${r}`).join("\n")}${notesText}${litText}${userContextText}${contextText}`;
+${allRequirements.map(r => `- ${r}`).join("\n")}${notesText}${litText}${contextText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -83,7 +82,7 @@ ${allRequirements.map(r => `- ${r}`).join("\n")}${notesText}${litText}${userCont
 
 // Improve existing section text
 router.post("/improve", async (req, res) => {
-  const { topic, sectionTitle, content, pubmedContext, userContext, language, writingStyle, prevSection, nextSection } = req.body;
+  const { topic, sectionId, sectionTitle, content, notes, pubmedContext, language, writingStyle, prevSection, nextSection } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -93,11 +92,15 @@ router.post("/improve", async (req, res) => {
   }
 
   const subject = topic.trim();
+  const { noCitations: noCitationsImprove } = getSectionRequirements(sectionId, "", "");
   const litText = pubmedContext?.trim()
-    ? `\n\nRecent literature from PubMed (use these for evidence and citations):\n${pubmedContext}`
+    ? `\n\nRecent literature from PubMed (use these for evidence and context):\n${pubmedContext}`
     : "";
-  const userContextText = userContext?.trim()
-    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+  const noCitationsNote = noCitationsImprove
+    ? "\n\nIMPORTANT: Do NOT add any citation markers, author names, or reference tags (e.g. [Author et al., Year], [1], (Smith 2021)) — this is an abstract and must not cite papers."
+    : "";
+  const notesText = notes?.trim()
+    ? `\n\nKey points and data the author wants to ensure are covered (treat any statistics or trial data as authoritative):\n${notes}`
     : "";
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
@@ -115,16 +118,19 @@ router.post("/improve", async (req, res) => {
     ...(nextSection ? [`Ensure the section closes with a forward-looking lead-in to the following "${nextSection.title}" section`] : []),
   ];
 
+  const citationBullet = noCitationsNote
+    ? ""
+    : "\n- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)";
+
   const prompt = `${languagePrefix}You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
 
 Make it:
 - More academically rigorous and precise in language
 - Better structured with clear logical flow and transitions
 - Consistent with standard ${subject} terminology and nomenclature
-- More concise where appropriate without losing key content
-- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)${styleText ? `\n- ${styleText}` : ""}${transitionBullets.map(b => `\n- ${b}`).join("")}
+- More concise where appropriate without losing key content${citationBullet}${styleText ? `\n- ${styleText}` : ""}${transitionBullets.map(b => `\n- ${b}`).join("")}
 
-Return ONLY the improved text — no explanations, no heading.${litText}${userContextText}${prevBlock}${nextBlock}
+Return ONLY the improved text — no explanations, no heading.${litText}${notesText}${prevBlock}${nextBlock}${noCitationsNote}
 
 Original text:
 ${content}`;
@@ -268,7 +274,7 @@ Example structure:
 
 // Refine an existing draft section with a user instruction
 router.post("/refine", async (req, res) => {
-  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language, writingStyle } = req.body;
+  const { topic, sectionId, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -280,6 +286,10 @@ router.post("/refine", async (req, res) => {
     return res.status(400).json({ error: "No refinement instruction provided." });
   }
 
+  const { noCitations } = getSectionRequirements(sectionId, "", "");
+  const noCitationsNote = noCitations
+    ? "\n\nIMPORTANT: Do NOT add any citation markers, author names, or reference tags (e.g. [Author et al., Year], [1], (Smith 2021)) — this is an abstract and must not cite papers."
+    : "";
   const litText = pubmedContext?.trim()
     ? `\n\n${pubmedContext}`
     : "";
@@ -297,7 +307,7 @@ The user has a draft of the "${sectionTitle}" section and wants to refine it wit
 Instruction: ${instruction}${styleText ? `\n${styleText}` : ""}
 
 Current draft:
-${currentDraft}${litText}${userContextText}
+${currentDraft}${litText}${userContextText}${noCitationsNote}
 
 Apply the instruction precisely. Preserve content not targeted by the instruction.
 Return ONLY the refined section text — no heading, no preamble, no explanation.`;

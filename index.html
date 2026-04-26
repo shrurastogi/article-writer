@@ -91,23 +91,10 @@
           <input type="checkbox" id="strict-mode-toggle" onchange="onStrictModeChange()" />
           <label for="strict-mode-toggle" style="margin:0;font-size:0.82rem;color:var(--secondary);cursor:pointer">Strict mode — require references for AI generation</label>
         </div>
-      </div>
-    </div>
-
-    <!-- Writing Style Calibration -->
-    <div class="panel" style="margin-bottom:12px;border-color:#c4b5fd">
-      <div class="panel-header" style="cursor:pointer;background:#f5f3ff" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-        <span class="panel-title" style="color:#6d28d9">Writing Style</span>
-        <span style="font-size:0.75rem;color:var(--muted)">optional — personalises AI output</span>
-      </div>
-      <div class="panel-body" id="style-panel-body">
-        <p style="font-size:0.82rem;color:var(--secondary);margin:0 0 10px">Paste a sample of your writing (100+ chars) and click <strong>Calibrate</strong>. The AI will match your tone, formality, and sentence rhythm.</p>
-        <div class="form-group">
-          <label>Sample Text</label>
-          <textarea id="style-sample" rows="4" placeholder="Paste a paragraph from a paper you've written…" style="font-size:0.82rem"></textarea>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:0.8rem;color:var(--muted)">
+          Writing style: <strong id="active-style-name" style="color:var(--secondary)">Loading…</strong>
+          <a href="/settings" style="color:var(--ai);text-decoration:none;margin-left:2px" title="Change in Settings">Change ↗</a>
         </div>
-        <button id="calibrate-btn" class="btn btn-sm" style="background:#7c3aed;color:#fff;margin-bottom:12px" onclick="calibrateStyle()">Calibrate</button>
-        <div id="style-card" style="display:none"></div>
       </div>
     </div>
 
@@ -177,10 +164,13 @@
     </div>
 
     <!-- Article sections (accordion) -->
+    <div style="display:flex;justify-content:flex-end;padding:4px 0 2px;gap:6px">
+      <button class="btn btn-secondary btn-sm" onclick="clearAll()" style="font-size:0.78rem">Clear All Sections</button>
+      <button class="btn btn-secondary btn-sm" onclick="collapseAllSections()" style="font-size:0.78rem" title="Collapse all sections">⊖ Collapse All</button>
+    </div>
     <div id="sections-container"></div>
     <div style="display:flex;justify-content:center;gap:8px;margin:10px 0 4px">
       <button class="btn btn-outline" onclick="openAddSectionModal()">+ Add Section</button>
-      <button class="btn btn-secondary btn-sm" onclick="collapseAllSections()" title="Collapse all sections">⊖ Collapse All</button>
     </div>
 
     <!-- Paper coherence checker -->
@@ -206,8 +196,6 @@
       <span class="panel-title">Article Preview</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="total-wc" id="total-wc">0 words</span>
-        <button class="btn btn-ai btn-sm" id="full-draft-btn" onclick="startFullDraft()">✨ Write Full Article</button>
-        <button class="btn btn-secondary btn-sm" onclick="clearAll()">Clear All</button>
         <button class="btn btn-secondary btn-sm" onclick="downloadDOCX()">⬇ DOCX</button>
         <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ PDF</button>
       </div>
@@ -223,17 +211,6 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Full Draft Progress Modal -->
-<div class="modal-overlay" id="draft-progress-modal">
-  <div class="draft-progress-box">
-    <div class="draft-progress-title">✨ Writing Full Article</div>
-    <div class="draft-progress-subtitle" id="draft-progress-subtitle">Generating drafts for each section…</div>
-    <div class="draft-section-list" id="draft-section-list"></div>
-    <div style="margin-top:16px;text-align:right">
-      <button class="btn btn-secondary btn-sm" onclick="cancelFullDraft()">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <!-- Add Section Modal -->
 <div class="modal-overlay" id="add-section-modal">

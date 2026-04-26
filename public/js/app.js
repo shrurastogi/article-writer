@@ -1,3 +1,14 @@
+// ── Writing Style Presets (mirrors settings.js) ──
+const WRITING_STYLE_PRESETS = [
+  { id: "none",              name: "None",                  styleProfile: null },
+  { id: "clinical_formal",  name: "Clinical & Formal",     styleProfile: { toneDescriptor: "formal, precise, clinical", formalityScore: 90, avgSentenceLength: 28, hedgingFrequency: "high" } },
+  { id: "clear_accessible", name: "Clear & Accessible",    styleProfile: { toneDescriptor: "formal yet accessible, reader-friendly", formalityScore: 70, avgSentenceLength: 20, hedgingFrequency: "moderate" } },
+  { id: "concise_direct",   name: "Concise & Direct",      styleProfile: { toneDescriptor: "concise, direct, economical", formalityScore: 75, avgSentenceLength: 15, hedgingFrequency: "low" } },
+  { id: "evidence_led",     name: "Evidence-Led",          styleProfile: { toneDescriptor: "data-forward, quantitative, citation-dense", formalityScore: 85, avgSentenceLength: 22, hedgingFrequency: "moderate" } },
+  { id: "narrative_engaging", name: "Narrative & Engaging",styleProfile: { toneDescriptor: "narrative, engaging, progressive", formalityScore: 65, avgSentenceLength: 18, hedgingFrequency: "low" } },
+  { id: "guideline_style",  name: "Guideline Style",       styleProfile: { toneDescriptor: "structured, prescriptive, recommendation-led", formalityScore: 88, avgSentenceLength: 16, hedgingFrequency: "low" } },
+];
+
 // ── Section definitions ──
 const SECTIONS_BY_TYPE = {
   review: [
@@ -74,9 +85,9 @@ const LEGACY_TITLES = {
 // ── State ──
 const state = {
   articleType: "review",
-  sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [] }])),
+  sections: Object.fromEntries(SECTIONS.map(s => [s.id, { prose: "", tables: [], keyPoints: "" }])),
   library: [],  // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, refNumber, selected }]
-  writingStyle: null, // { sampleText, styleProfile, calibratedAt } — set via Calibrate button
+  writingStyle: null, // { presetId, styleProfile } — loaded from user settings on init
 };
 
 const refinementHistory = {};  // { [sectionId]: string[] }
@@ -128,6 +139,7 @@ function adjustFontSize(delta) {
   applyTheme();
   applyFontSize(parseInt(localStorage.getItem("font-size") || FONT_DEFAULT));
   await checkAuth();
+  await loadUserStyle();
   await loadArticle();
   renderSections();
   renderConfidenceBars();
@@ -202,7 +214,7 @@ function renderSections() {
   const container = document.getElementById("sections-container");
   // Ensure state exists for every section
   SECTIONS.forEach(s => {
-    if (!state.sections[s.id]) state.sections[s.id] = { prose: "", tables: [], userContext: "" };
+    if (!state.sections[s.id]) state.sections[s.id] = { prose: "", tables: [], keyPoints: "" };
   });
   container.innerHTML = SECTIONS.map(s => {
     const titleEsc = s.title.replace(/'/g, "\\'");
@@ -231,36 +243,29 @@ function renderSections() {
           style="margin-bottom:8px"
           spellcheck="true"
         ></textarea>
-        <div class="notes-label-row">
-          <span class="notes-label">Focus / angle for AI</span>
-          <a class="suggest-outline-link" onclick="suggestOutline('${s.id}','${titleEsc}');event.stopPropagation()">💡 Suggest what to cover</a>
-        </div>
-        <input
-          type="text"
-          id="notes-${s.id}"
-          class="notes-input"
-          placeholder="${(NOTES_PLACEHOLDERS[s.id] || DEFAULT_NOTES_PLACEHOLDER).replace(/"/g, '&quot;')}"
-          onclick="event.stopPropagation()"
-          spellcheck="true"
-        />
-        <div class="user-ctx-toggle" title="Paste raw numbers, trial results, or patient data. AI treats this as fact." onclick="toggleUserCtx('${s.id}');event.stopPropagation()">
-          <span class="user-ctx-hint">+ Add your own data / statistics</span>
-          <span class="user-ctx-chevron" id="user-ctx-chevron-${s.id}">▶</span>
-        </div>
-        <div class="user-ctx-body" id="user-ctx-body-${s.id}" style="display:none">
+        ${s.id !== "references" ? `
+        <div class="keypoints-area" id="keypoints-area-${s.id}">
+          <div class="keypoints-header">
+            <span class="keypoints-label">📋 Key points to cover</span>
+            <button class="btn btn-outline btn-xs keypoints-suggest-btn"
+                    onclick="suggestKeyPoints('${s.id}','${titleEsc}');event.stopPropagation()"
+                    id="kp-suggest-btn-${s.id}">💡 Suggest</button>
+          </div>
           <textarea
-            class="user-ctx-input"
-            id="user-ctx-${s.id}"
+            id="keypoints-${s.id}"
+            class="keypoints-textarea"
             rows="4"
-            placeholder="Paste your own data, patient numbers, trial results, statistics, or notes here. AI will treat this as authoritative when generating content for this section."
-            oninput="updateUserCtx('${s.id}', this.value)"
+            placeholder="• One key point per line&#10;• Add your own data, stats, trial results&#10;• Click 💡 Suggest to get AI recommendations"
+            oninput="updateKeyPoints('${s.id}', this.value)"
+            onclick="event.stopPropagation()"
             spellcheck="true"
           ></textarea>
-        </div>
+        </div>` : ""}
         <div class="section-ai-actions">
+          ${s.id !== "references" ? `
           <button class="btn btn-ai btn-sm section-action-btn" onclick="smartWrite('${s.id}','${titleEsc}')">✨ Write</button>
           <button class="btn btn-outline btn-sm section-action-btn" onclick="openTablePrompt('${s.id}','${titleEsc}')">+ Table</button>
-          <div class="confidence-bar" id="conf-${s.id}"></div>
+          <div class="confidence-bar" id="conf-${s.id}"></div>` : ""}
         </div>
         <div class="grammar-panel" id="grammar-${s.id}" style="display:none">
           <div class="grammar-panel-header">
@@ -297,14 +302,8 @@ function renderSections() {
   SECTIONS.forEach(s => {
     const el = document.getElementById(`content-${s.id}`);
     if (el) el.value = state.sections[s.id]?.prose || "";
-    const ctxEl = document.getElementById(`user-ctx-${s.id}`);
-    if (ctxEl) {
-      ctxEl.value = state.sections[s.id]?.userContext || "";
-      if (ctxEl.value) {
-        document.getElementById(`user-ctx-body-${s.id}`).style.display = "block";
-        document.getElementById(`user-ctx-chevron-${s.id}`).textContent = "▼";
-      }
-    }
+    const kpEl = document.getElementById(`keypoints-${s.id}`);
+    if (kpEl) kpEl.value = state.sections[s.id]?.keyPoints || "";
     updateWordCount(s.id);
     renderSectionTables(s.id);
   });
@@ -525,44 +524,35 @@ function _getAdjacentSections(id) {
 
 function generateDraft(id, title) {
   if (!checkContextGrounding(id)) return;
-  const notes = document.getElementById(`notes-${id}`)?.value || "";
+  const notes = document.getElementById(`keypoints-${id}`)?.value || "";
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
   const { prevSection, nextSection } = _getAdjacentSections(id);
   const existingSections = SECTIONS
     .filter(s => s.id !== id && state.sections[s.id]?.prose?.trim())
     .map(s => ({ title: s.title, prose: state.sections[s.id].prose }));
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, articleType: state.articleType, existingSections, prevSection, nextSection }, id, "✨ Generated Draft", true, warn);
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, language: getLanguage(), writingStyle: state.writingStyle, articleType: state.articleType, existingSections, prevSection, nextSection }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
   if (!checkContextGrounding(id)) return;
   const content = state.sections[id]?.prose;
   if (!content?.trim()) { showToast("Please write something in this section first.", "error"); return; }
+  const notes = document.getElementById(`keypoints-${id}`)?.value || "";
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
   const { prevSection, nextSection } = _getAdjacentSections(id);
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, prevSection, nextSection }, id, "✨ Improved Text", true, warn);
+  streamToAiBox("/api/improve", { sectionId: id, sectionTitle: title, content, notes, topic, pubmedContext, language: getLanguage(), writingStyle: state.writingStyle, prevSection, nextSection }, id, "✨ Improved Text", true, warn);
 }
 
-function getKeyPoints(id, title) {
-  if (!checkContextGrounding(id)) return;
-  const topic = getTopic();
-  const pubmedContext = getSelectedPubmedContext();
-  const userContext = state.sections[id]?.userContext || "";
-  const warn = !hasSelectedRefs();
-  streamToAiBox("/api/keypoints", { sectionId: id, sectionTitle: title, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "💡 Key Points to Cover", false, warn);
-}
-
-async function suggestOutline(id, title) {
-  const notesEl = document.getElementById(`notes-${id}`);
-  if (!notesEl) return;
-  const link = document.querySelector(`.suggest-outline-link[onclick*="suggestOutline('${id}'"]`);
-  if (link) { link.textContent = "Loading…"; link.style.pointerEvents = "none"; }
+async function suggestKeyPoints(id, title) {
+  const kpEl = document.getElementById(`keypoints-${id}`);
+  const btn = document.getElementById(`kp-suggest-btn-${id}`);
+  if (!kpEl || !btn) return;
+  btn.textContent = "Loading…";
+  btn.disabled = true;
   try {
     const resp = await fetch("/api/keypoints", {
       method: "POST",
@@ -570,7 +560,7 @@ async function suggestOutline(id, title) {
       body: JSON.stringify({
         topic: getTopic(), sectionId: id, sectionTitle: title,
         pubmedContext: getSelectedPubmedContext(),
-        userContext: state.sections[id]?.userContext || "",
+        userContext: state.sections[id]?.keyPoints || "",
         language: getLanguage(),
         writingStyle: state.writingStyle,
       }),
@@ -584,13 +574,15 @@ async function suggestOutline(id, title) {
       if (done) break;
       text += decoder.decode(value, { stream: true });
     }
-    notesEl.value = text.trim();
-    notesEl.dispatchEvent(new Event("input"));
-    showToast("Outline added to notes — edit it, then click Write.", "success");
+    const existing = kpEl.value.trim();
+    kpEl.value = existing ? existing + "\n\n" + text.trim() : text.trim();
+    kpEl.dispatchEvent(new Event("input"));
+    showToast("Key points added — edit or add your own, then click Write.", "success");
   } catch {
-    showToast("Could not suggest outline. Please try again.", "error");
+    showToast("Could not suggest key points. Please try again.", "error");
   } finally {
-    if (link) { link.textContent = "💡 Suggest what to cover"; link.style.pointerEvents = ""; }
+    btn.textContent = "💡 Suggest";
+    btn.disabled = false;
   }
 }
 
@@ -741,7 +733,6 @@ function expandToProse(id, title) {
   if (!prose.trim()) { showToast("Paste your bullet points or rough notes into this section first.", "error"); return; }
   const topic = getTopic();
   const pubmedContext = getSelectedPubmedContext();
-  const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
   streamToAiBox("/api/refine", {
     topic,
@@ -749,7 +740,6 @@ function expandToProse(id, title) {
     currentDraft: prose,
     instruction: "Convert these bullet points and rough notes into flowing, formal academic prose suitable for a peer-reviewed journal review article. Preserve every piece of information provided, expand key points with appropriate context, add smooth transitions between ideas, and insert [Author et al., Year] citation placeholders where evidence is implied. Do not invent facts not present in the input.",
     pubmedContext,
-    userContext,
     language: getLanguage(),
     writingStyle: state.writingStyle,
   }, id, "✍ Expanded Prose", true, warn);
@@ -959,6 +949,19 @@ async function checkAuth() {
   }
 }
 
+async function loadUserStyle() {
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return;
+    const data = await res.json();
+    const presetId = data.preferences?.writingStylePreset || "none";
+    const preset = WRITING_STYLE_PRESETS.find(p => p.id === presetId) || WRITING_STYLE_PRESETS[0];
+    state.writingStyle = preset.styleProfile ? { presetId, styleProfile: preset.styleProfile } : null;
+    const el = document.getElementById("active-style-name");
+    if (el) el.textContent = preset.name;
+  } catch { /* non-critical — AI generation continues without style guidance */ }
+}
+
 function hydrateUserWidget(user) {
   const wrap = document.getElementById("user-avatar-wrap");
   if (user.avatarUrl) {
@@ -982,14 +985,10 @@ async function signOut() {
   window.location.href = "/login";
 }
 
-// ── Auto-save (localStorage write-behind + server primary) ──
-// Stub — full implementation in PR 5 (writing style calibration)
-function renderStyleCard(writingStyle) { /* expanded in sprint6-writing-style */ }
-
 function applyViewMode() {
   if (!viewMode) return;
   document.querySelectorAll("textarea, input, select").forEach(el => el.disabled = true);
-  document.querySelectorAll("button.ai-btn, button.section-action-btn, #full-draft-btn, #run-flow-check").forEach(el => el.disabled = true);
+  document.querySelectorAll("button.ai-btn, button.section-action-btn, #run-flow-check").forEach(el => el.disabled = true);
   const banner = document.createElement("div");
   banner.className = "view-mode-banner";
   banner.textContent = "View-only mode — this article is locked";
@@ -1040,7 +1039,7 @@ function onArticleTypeChange(newType) {
   state.articleType = newType;
   SECTIONS = getSectionsForType(newType);
   const newSections = {};
-  SECTIONS.forEach(s => { newSections[s.id] = prevProse[s.id] || { prose: "", tables: [], userContext: "" }; });
+  SECTIONS.forEach(s => { newSections[s.id] = prevProse[s.id] || { prose: "", tables: [], keyPoints: "" }; });
   state.sections = newSections;
   renumberSections();
   renderSections();
@@ -1363,10 +1362,13 @@ function applyArticleData(data) {
       const tables = typeof val === "object" ? (val?.tables || []) : [];
       const targetId = LEGACY_REMAP[id] || id;
 
-      const userContext = typeof val === "object" ? (val?.userContext || "") : "";
+      // Migrate: keyPoints preferred; fall back to legacy userContext for old articles
+      const keyPoints = typeof val === "object"
+        ? (val?.keyPoints || val?.userContext || "")
+        : "";
       if (knownIds.has(targetId)) {
         // Known section (possibly remapped from a legacy key)
-        state.sections[targetId] = { prose, tables, userContext };
+        state.sections[targetId] = { prose, tables, keyPoints };
       } else if (prose.trim() || tables.length) {
         // Unknown legacy section with content — restore as a custom section
         if (!SECTIONS.find(s => s.id === id)) {
@@ -1374,7 +1376,7 @@ function applyArticleData(data) {
           SECTIONS.splice(refIdx, 0, { id, num: "", title, placeholder: `Write about ${title}...`, isCustom: true });
           knownIds.add(id);
         }
-        state.sections[id] = { prose, tables, userContext };
+        state.sections[id] = { prose, tables, keyPoints };
       }
     }
   }
@@ -1383,66 +1385,14 @@ function applyArticleData(data) {
     state.library = data.library;
     renderLibrary();
   }
-  if (data.writingStyle) {
-    state.writingStyle = data.writingStyle;
-    renderStyleCard(data.writingStyle);
-  }
+  // writingStyle is now a user-level preference loaded from /api/settings — not per-article
   renumberSections();
   SECTIONS.forEach(s => updateWordCount(s.id));
   updateTotalWordCount();
   applyViewMode();
 }
 
-// ── Writing Style ──
-async function calibrateStyle() {
-  if (!articleId) { showToast("Save the article first (open from Dashboard).", "error"); return; }
-  const sampleEl = document.getElementById("style-sample");
-  const sampleText = sampleEl?.value.trim() || "";
-  if (sampleText.length < 100) { showToast("Paste at least 100 characters of sample text.", "error"); return; }
-
-  const btn = document.getElementById("calibrate-btn");
-  btn.disabled = true;
-  btn.textContent = "Calibrating…";
-
-  try {
-    const res = await fetch(`/api/articles/${articleId}/calibrate-style`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sampleText }),
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-    const { writingStyle } = await res.json();
-    state.writingStyle = writingStyle;
-    renderStyleCard(writingStyle);
-    showToast("Writing style calibrated.", "success");
-  } catch (err) {
-    showToast("Calibration failed: " + err.message, "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Calibrate";
-  }
-}
-
-function renderStyleCard(writingStyle) {
-  const card = document.getElementById("style-card");
-  if (!card) return;
-  if (!writingStyle?.styleProfile) { card.style.display = "none"; return; }
-  const p = writingStyle.styleProfile;
-  const calibratedAt = writingStyle.calibratedAt
-    ? new Date(writingStyle.calibratedAt).toLocaleDateString()
-    : "";
-  card.style.display = "";
-  card.innerHTML = `
-    <div class="style-card-header">Style Profile${calibratedAt ? ` <span class="style-card-date">calibrated ${calibratedAt}</span>` : ""}</div>
-    <div class="style-card-metrics">
-      ${p.toneDescriptor ? `<div class="style-metric"><span class="style-metric-label">Tone</span><span class="style-metric-value">${p.toneDescriptor}</span></div>` : ""}
-      ${p.formalityScore != null ? `<div class="style-metric"><span class="style-metric-label">Formality</span><span class="style-metric-value">${p.formalityScore}/100</span></div>` : ""}
-      ${p.avgSentenceLength ? `<div class="style-metric"><span class="style-metric-label">Avg sentence</span><span class="style-metric-value">${p.avgSentenceLength} words</span></div>` : ""}
-      ${p.activeVoicePercent != null ? `<div class="style-metric"><span class="style-metric-label">Active voice</span><span class="style-metric-value">${p.activeVoicePercent}%</span></div>` : ""}
-      ${p.hedgingFrequency ? `<div class="style-metric"><span class="style-metric-label">Hedging</span><span class="style-metric-value">${p.hedgingFrequency}</span></div>` : ""}
-      ${p.citationDensity ? `<div class="style-metric"><span class="style-metric-label">Citations</span><span class="style-metric-value">${p.citationDensity}</span></div>` : ""}
-    </div>`;
-}
+// Writing style is loaded from user settings on init via loadUserStyle() — no per-article calibration.
 
 // ── Clear all ──
 function clearAll() {
@@ -1917,19 +1867,9 @@ function deleteSection(id) {
   scheduleAutoSave();
 }
 
-function toggleUserCtx(id) {
-  const body = document.getElementById(`user-ctx-body-${id}`);
-  const chevron = document.getElementById(`user-ctx-chevron-${id}`);
-  if (!body) return;
-  const open = body.style.display === "block";
-  body.style.display = open ? "none" : "block";
-  chevron.textContent = open ? "▶" : "▼";
-  if (!open) document.getElementById(`user-ctx-${id}`)?.focus();
-}
-
-function updateUserCtx(id, value) {
-  if (!state.sections[id]) state.sections[id] = { prose: "", tables: [], userContext: "" };
-  state.sections[id].userContext = value;
+function updateKeyPoints(id, value) {
+  if (!state.sections[id]) state.sections[id] = { prose: "", tables: [], keyPoints: "" };
+  state.sections[id].keyPoints = value;
   scheduleAutoSave();
 }
 
@@ -2043,7 +1983,7 @@ function refineSection(id, title) {
   if (undoBtn) undoBtn.style.display = "";
   document.getElementById(`refine-input-${id}`).value = "";
   streamToAiBox("/api/refine", {
-    topic: getTopic(), sectionTitle: title,
+    topic: getTopic(), sectionId: id, sectionTitle: title,
     currentDraft, instruction,
     pubmedContext: getSelectedPubmedContext(),
     language: getLanguage(),
@@ -2081,131 +2021,6 @@ function enhanceCitations(text, library) {
   });
 }
 
-// ── One-click full draft ──
-let draftAbortController = null;
-
-async function startFullDraft() {
-  const topic = getTopic();
-  if (!topic) { showToast("Set a Medical Topic first.", "error"); return; }
-
-  const sectionsPayload = SECTIONS
-    .filter(s => s.id !== "references")
-    .map(s => ({
-      id: s.id,
-      title: s.title,
-      notes: document.getElementById(`notes-${s.id}`)?.value || "",
-      userContext: state.sections[s.id]?.userContext || "",
-    }));
-
-  const modal = document.getElementById("draft-progress-modal");
-  const list = document.getElementById("draft-section-list");
-  const subtitle = document.getElementById("draft-progress-subtitle");
-
-  modal.classList.add("open");
-  subtitle.textContent = "Generating drafts for each section…";
-  list.innerHTML = sectionsPayload.map(s =>
-    `<div class="draft-section-row" id="drow-${s.id}">
-      <div class="draft-section-row-title">${htmlEsc(s.title)}</div>
-      <span class="draft-section-status" id="dstatus-${s.id}">Queued</span>
-    </div>`
-  ).join("");
-
-  draftAbortController = new AbortController();
-
-  try {
-    const resp = await fetch("/api/agent/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic,
-        sections: sectionsPayload,
-        language: getLanguage(),
-        pubmedContext: getSelectedPubmedContext(),
-        writingStyle: state.writingStyle,
-        articleType: state.articleType,
-      }),
-      signal: draftAbortController.signal,
-    });
-
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const evt = JSON.parse(line.slice(6));
-          handleDraftEvent(evt);
-        } catch { /* partial line */ }
-      }
-    }
-  } catch (err) {
-    if (err.name !== "AbortError") {
-      showToast("Draft generation failed: " + err.message, "error");
-    }
-    modal.classList.remove("open");
-  }
-}
-
-function handleDraftEvent(evt) {
-  const list = document.getElementById("draft-section-list");
-  const subtitle = document.getElementById("draft-progress-subtitle");
-
-  if (evt.type === "section_start") {
-    const statusEl = document.getElementById(`dstatus-${evt.id}`);
-    if (statusEl) statusEl.textContent = "Generating…";
-  } else if (evt.type === "section_done") {
-    const row = document.getElementById(`drow-${evt.id}`);
-    if (row) {
-      const preview = evt.content.slice(0, 120).replace(/\n/g, " ");
-      row.innerHTML = `
-        <div class="draft-section-row-title">${htmlEsc(evt.title)}</div>
-        <div class="draft-section-preview">${htmlEsc(preview)}…</div>
-        <div class="draft-section-actions">
-          <button class="btn btn-ai btn-sm" onclick="approveDraftSection('${evt.id}',${JSON.stringify(evt.content)})">Apply</button>
-          <button class="btn btn-secondary btn-sm" onclick="skipDraftSection('${evt.id}')">Skip</button>
-        </div>`;
-    }
-  } else if (evt.type === "complete") {
-    subtitle.textContent = "All sections generated. Review and apply below.";
-  } else if (evt.type === "error") {
-    showToast("Error: " + evt.message, "error");
-  }
-}
-
-function approveDraftSection(id, content) {
-  state.sections[id] = state.sections[id] || { prose: "", tables: [], userContext: "" };
-  state.sections[id].prose = content;
-  const textarea = document.getElementById(`content-${id}`);
-  if (textarea) textarea.value = content;
-  updateWordCount(id);
-  updatePreview();
-  scheduleAutoSave();
-  const row = document.getElementById(`drow-${id}`);
-  if (row) {
-    row.querySelector(".draft-section-actions").innerHTML = '<span style="color:#16a34a;font-size:0.8rem;font-weight:600">✓ Applied</span>';
-  }
-}
-
-function skipDraftSection(id) {
-  const row = document.getElementById(`drow-${id}`);
-  if (row) {
-    row.querySelector(".draft-section-actions").innerHTML = '<span style="color:var(--muted);font-size:0.8rem">Skipped</span>';
-  }
-}
-
-function cancelFullDraft() {
-  draftAbortController?.abort();
-  document.getElementById("draft-progress-modal").classList.remove("open");
-}
 
 // ── Agentic RAG — "Ask Your Library" panel ───────────────────────────────────
 

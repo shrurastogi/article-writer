@@ -53,6 +53,7 @@ router.get("/settings", requireApiAuth, async (req, res) => {
         fontSize: user.preferences?.fontSize || 14,
         language: user.preferences?.language || "English",
         strictMode: user.preferences?.strictMode || false,
+        writingStylePreset: user.preferences?.writingStylePreset || "none",
       },
     });
   } catch (err) {
@@ -80,10 +81,11 @@ router.put("/settings", requireApiAuth, async (req, res) => {
 
     if (preferences) {
       if (!user.preferences) user.preferences = {};
-      if (preferences.theme !== undefined)      user.preferences.theme = preferences.theme;
-      if (preferences.fontSize !== undefined)   user.preferences.fontSize = preferences.fontSize;
-      if (preferences.language !== undefined)   user.preferences.language = preferences.language;
-      if (preferences.strictMode !== undefined) user.preferences.strictMode = preferences.strictMode;
+      if (preferences.theme !== undefined)              user.preferences.theme = preferences.theme;
+      if (preferences.fontSize !== undefined)           user.preferences.fontSize = preferences.fontSize;
+      if (preferences.language !== undefined)           user.preferences.language = preferences.language;
+      if (preferences.strictMode !== undefined)         user.preferences.strictMode = preferences.strictMode;
+      if (preferences.writingStylePreset !== undefined) user.preferences.writingStylePreset = preferences.writingStylePreset;
     }
 
     user.markModified("llmConfig");
@@ -94,7 +96,7 @@ router.put("/settings", requireApiAuth, async (req, res) => {
     res.json({
       llmConfig: { provider: user.llmConfig.provider, model: user.llmConfig.model, hasKey: !!(user.llmConfig.encryptedApiKey) },
       researchConfig: { hasNcbiKey: !!(user.researchConfig.encryptedNcbiKey) },
-      preferences: { theme: user.preferences.theme, fontSize: user.preferences.fontSize, language: user.preferences.language, strictMode: user.preferences.strictMode },
+      preferences: { theme: user.preferences.theme, fontSize: user.preferences.fontSize, language: user.preferences.language, strictMode: user.preferences.strictMode, writingStylePreset: user.preferences.writingStylePreset || "none" },
     });
   } catch (err) {
     logger.error({ msg: "Update settings error", error: err.message, userId: req.user._id.toString() });

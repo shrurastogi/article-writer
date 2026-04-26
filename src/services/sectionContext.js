@@ -74,7 +74,8 @@ function getSectionRequirements(sectionId, journalHint, styleText) {
   const sections = {
 
     abstract: {
-      suppressPubmed: true,
+      suppressPubmed: false,
+      noCitations: true,
       suppressExistingSections: true,
       maxTokens: 600,
       requirements: [

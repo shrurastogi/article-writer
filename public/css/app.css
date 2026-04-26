@@ -333,12 +333,14 @@
     .grounding-warning { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; margin-bottom: 8px; }
 
     /* ── User Data Context ── */
-    .user-ctx-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin: 6px 0 4px; font-size: 0.78rem; color: var(--secondary); user-select: none; }
-    .user-ctx-toggle:hover { color: var(--primary); }
-    .user-ctx-hint { font-weight: 500; }
-    .user-ctx-chevron { font-size: 0.6rem; }
-    .user-ctx-input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 0.82rem; font-family: inherit; resize: vertical; color: var(--text); background: #fffbf5; margin-bottom: 6px; }
-    .user-ctx-input:focus { outline: none; border-color: var(--primary); }
+    /* ── Key Points area (replaces notes + userContext) ── */
+    .keypoints-area { margin: 8px 0 6px; }
+    .keypoints-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .keypoints-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+    .keypoints-textarea { width: 100%; font-size: 0.84rem; line-height: 1.6; border: 1px dashed var(--border); border-radius: 6px; padding: 8px 10px; resize: vertical; font-family: inherit; color: var(--text); background: #fafaf9; box-sizing: border-box; }
+    .keypoints-textarea:focus { outline: none; border-color: var(--ai); border-style: solid; background: #fff; }
+    .keypoints-textarea::placeholder { color: var(--muted); font-style: italic; }
+    .btn-xs { font-size: 0.72rem; padding: 2px 8px; height: auto; line-height: 1.6; }
 
     /* ── AI Confidence Indicator ── */
     .confidence-bar { font-size: 0.73rem; padding: 3px 8px; border-radius: 10px; margin-top: 6px; display: inline-block; cursor: default; }
