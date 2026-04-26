@@ -55,4 +55,158 @@ function getStyleInstruction(writingStyle) {
   return `Writing style guidance: ${parts.join(", ")}. Match this style.`;
 }
 
-module.exports = { getSectionContext, getStyleInstruction };
+// Universal rules applied to every section except where overridden.
+const UNIVERSAL_RULES = [
+  "Spell out numbers one through nine; use numerals for 10 and above, and always for measurements with units",
+  "Define every abbreviation at first use; never use abbreviations in headings",
+  "Format p-values as P=0.03 (capital P, exact value — never P<0.05 alone)",
+  "Use generic drug names first; add trade name in parentheses at first mention only",
+  "Prefer active voice unless passive is conventionally required (e.g. Methods)",
+  "Never write 'data not shown' — either include the data or omit the claim",
+];
+
+// Returns { requirements: string[], suppressPubmed: boolean, maxTokens: number }
+function getSectionRequirements(sectionId, journalHint, styleText) {
+  const style  = styleText ? [`${styleText}`] : [];
+  const base   = `Formal academic writing style suitable for a high-impact journal (e.g. ${journalHint})`;
+  const retOnly = "Return ONLY the section content — no section heading, no preamble, no explanations";
+
+  const sections = {
+
+    abstract: {
+      suppressPubmed: true,
+      suppressExistingSections: true,
+      maxTokens: 600,
+      requirements: [
+        base,
+        "Structured format with these headings on separate lines: Background: | Objective: | Key Findings: | Conclusions:",
+        "150–250 words total — strict limit",
+        "Drug names (generic and brand) and clinical trial names (e.g. KEYNOTE-522, IMROZ) are permitted",
+        "Past tense for findings and methods; present tense for conclusions and established facts",
+        "Self-contained — readable and complete without access to the rest of the article",
+        "Return ONLY the abstract text — no heading, no preamble, no word count",
+        ...style,
+        "CRITICAL: DO NOT include author citations, people's names, or reference markers of any kind (e.g. [Smith et al., 2023], (Jones 2021), [1], [2]) — abstracts never cite authors or papers",
+      ],
+    },
+
+    introduction: {
+      suppressPubmed: false,
+      maxTokens: 1200,
+      requirements: [
+        base,
+        "Exactly 3–4 paragraphs structured as: (1) disease background and global burden, (2) current standard of care and unmet need, (3) knowledge gap and rationale for this review, (4) explicit statement of scope — what this article covers",
+        "400–600 words",
+        "Cite 5–15 seminal references only using [Author et al., Year] placeholders",
+        "Present tense for established facts; past tense for prior studies",
+        "No results, conclusions, or treatment recommendations",
+        retOnly,
+        ...UNIVERSAL_RULES,
+        ...style,
+      ],
+    },
+
+    discussion: {
+      suppressPubmed: false,
+      maxTokens: 1800,
+      requirements: [
+        base,
+        "Open with a single sentence summarising the most important finding of this review",
+        "Structure: (1) key finding in context, (2) comparison with published literature using [Author et al., Year], (3) explanation of any discrepancies, (4) explicit Limitations paragraph — be specific, not vague, (5) clinical implications, (6) future directions",
+        "600–900 words",
+        "Do NOT restate results verbatim — interpret and contextualise them",
+        "Limitations paragraph is mandatory — name specific limitations, do not hedge with generalities",
+        "Citations as [Author et al., Year] placeholders where comparing with literature",
+        retOnly,
+        ...UNIVERSAL_RULES,
+        ...style,
+      ],
+    },
+
+    conclusions: {
+      suppressPubmed: true,
+      maxTokens: 500,
+      requirements: [
+        base,
+        "100–150 words maximum",
+        "No citations or references",
+        "No new data or findings not already presented in the article body",
+        "Do not use 'further research is needed' alone — name the specific gap or question",
+        "Present tense throughout",
+        "No subheadings",
+        retOnly,
+        ...UNIVERSAL_RULES,
+        ...style,
+      ],
+    },
+
+    // original_research sections
+    methods: {
+      suppressPubmed: false,
+      maxTokens: 1800,
+      requirements: [
+        base,
+        "Past tense throughout",
+        "Subsections: Study Design, Participants (inclusion/exclusion criteria), Interventions, Outcomes (primary and secondary explicitly defined), Statistical Analysis",
+        "Name every statistical test used — do not write 'statistical analysis was performed'",
+        "Include ethics/IRB approval statement and informed consent",
+        "Reference applicable reporting guideline (CONSORT for RCTs, PRISMA for systematic reviews, STROBE for observational studies)",
+        "No results in this section",
+        retOnly,
+        ...UNIVERSAL_RULES,
+        ...style,
+      ],
+    },
+
+    results: {
+      suppressPubmed: false,
+      maxTokens: 1800,
+      requirements: [
+        base,
+        "Past tense throughout",
+        "Report data only — no interpretation, no comparison with other studies (that belongs in Discussion)",
+        "Report exact P-values (P=0.03), effect sizes, and 95% CI for all primary and secondary outcomes",
+        "Round means to 1 decimal place; proportions to 1 decimal place; P-values to 2–3 significant figures",
+        "Reference tables and figures parenthetically (e.g. Table 1, Figure 2) but do not duplicate data already shown in them",
+        retOnly,
+        ...UNIVERSAL_RULES,
+        ...style,
+      ],
+    },
+
+    // review body sections — shared rules
+    main_body:        null,
+    epidemiology:     null,
+    pathophysiology:  null,
+    diagnosis:        null,
+    staging:          null,
+    treatment_nd:     null,
+    treatment_rr:     null,
+    novel_therapies:  null,
+    supportive_care:  null,
+    future_directions: null,
+    conclusion:       null,   // legacy alias for conclusions
+  };
+
+  // Sections explicitly mapped to null use the standard body rules below
+  const entry = sections[sectionId];
+  if (entry && entry !== null) return entry;
+
+  // Standard body section (review article sections, legacy sections)
+  return {
+    suppressPubmed: false,
+    maxTokens: 1800,
+    requirements: [
+      base,
+      "Evidence-based with citations as [Author et al., Year] placeholders",
+      "300–600 words with subheadings where appropriate",
+      "Include landmark trial names, key statistics, approved agents, and current guideline recommendations",
+      "Past tense for completed studies; present tense for current standards and established facts",
+      retOnly,
+      ...UNIVERSAL_RULES,
+      ...style,
+    ],
+  };
+}
+
+module.exports = { getSectionContext, getStyleInstruction, getSectionRequirements };

@@ -30,6 +30,33 @@ function getSectionsForType(type) {
 }
 let SECTIONS = getSectionsForType("review");
 
+// Per-section placeholder text for the "Focus / angle for AI" notes input.
+const NOTES_PLACEHOLDERS = {
+  abstract:          "e.g. 'highlight key efficacy and safety outcomes', 'mention recent regulatory approvals', 'emphasise the unmet need addressed'",
+  introduction:      "e.g. 'emphasise unmet need in the frontline setting', 'stress global incidence trends', 'focus on economic and quality-of-life burden'",
+  main_body:         "e.g. 'focus on Phase III RCT data only', 'cover biomarkers and patient selection criteria', 'include head-to-head trial comparisons'",
+  discussion:        "e.g. 'compare findings with [trial name]', 'address OS vs PFS as primary endpoint debate', 'discuss why results differ from earlier studies'",
+  conclusions:       "e.g. 'emphasise implications for clinical practice', 'highlight evidence gap for elderly or frail patients', 'stress need for MRD-guided trials'",
+  references:        "e.g. 'prioritise Phase III trials and landmark papers from the past 5 years'",
+  // original research
+  methods:           "e.g. 'include CONSORT flow diagram description', 'specify the primary statistical test', 'mention any protocol deviations'",
+  results:           "e.g. 'lead with the primary endpoint result', 'include subgroup analyses for age and ECOG status', 'report AEs by grade'",
+  // perspective
+  perspective_body:  "e.g. 'argue for earlier use in transplant-ineligible patients', 'address the cost-effectiveness debate', 'counter the standard-of-care argument'",
+  // legacy review subsections
+  epidemiology:      "e.g. 'include SEER and GLOBOCAN data', 'focus on incidence trends post-2015', 'cover racial and geographic disparities'",
+  pathophysiology:   "e.g. 'focus on the BCMA/APRIL pathway', 'include role of the bone marrow microenvironment', 'cover MYC amplification and del(17p)'",
+  diagnosis:         "e.g. 'include IMWG 2014 diagnostic criteria', 'cover MRD assessment methods', 'discuss liquid biopsy and ctDNA'",
+  staging:           "e.g. 'cover R-ISS staging in detail', 'include cytogenetic risk stratification', 'discuss limitations of ISS in the novel-agent era'",
+  treatment_nd:      "e.g. 'focus on daratumumab-based quadruplet regimens', 'cover transplant-eligible vs ineligible algorithms', 'include MAIA and CASSIOPEIA data'",
+  treatment_rr:      "e.g. 'cover BCMA-targeted therapies (ADCs, bispecifics, CAR-T)', 'focus on 3rd line and beyond', 'include IKEMA and CANDOR trial results'",
+  novel_therapies:   "e.g. 'focus on bispecific antibodies approved post-2022', 'cover CAR-T persistence and manufacturing challenges', 'include CELMoDs'",
+  supportive_care:   "e.g. 'include VTE prophylaxis guidelines for IMiDs', 'cover bone disease — bisphosphonates vs denosumab', 'address infection prophylaxis'",
+  future_directions: "e.g. 'focus on MRD-guided treatment cessation trials', 'cover ongoing quadruplet vs triplet Phase III studies', 'discuss CAR-T in earlier lines'",
+};
+
+const DEFAULT_NOTES_PLACEHOLDER = "e.g. 'emphasise RCT data and hazard ratios', 'focus on paediatric dosing', 'stress recent guideline changes'";
+
 // Legacy section IDs for articles created before the Sprint 2 section restructure.
 // Used in applyArticleData to migrate old content into custom sections.
 const LEGACY_TITLES = {
@@ -212,7 +239,7 @@ function renderSections() {
           type="text"
           id="notes-${s.id}"
           class="notes-input"
-          placeholder="e.g. 'emphasise RCT data and hazard ratios', 'focus on paediatric dosing'"
+          placeholder="${(NOTES_PLACEHOLDERS[s.id] || DEFAULT_NOTES_PLACEHOLDER).replace(/"/g, '&quot;')}"
           onclick="event.stopPropagation()"
           spellcheck="true"
         />
@@ -291,6 +318,10 @@ function toggleSection(id) {
 
 function openSection(id) {
   document.getElementById(`section-${id}`).classList.add("open");
+}
+
+function collapseAllSections() {
+  document.querySelectorAll(".section-panel.open").forEach(el => el.classList.remove("open"));
 }
 
 // ── State updates ──
@@ -405,7 +436,11 @@ async function streamToAiBox(url, body, sectionId, label, canApply, warnNoRefs =
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    if (!resp.ok) {
+      let msg = `Server error (${resp.status})`;
+      try { const e = await resp.json(); msg = e.error || msg; } catch { /* non-JSON response */ }
+      throw new Error(msg);
+    }
 
     // Preserve grounding warning if present, then stream text after it
     if (warnNoRefs) {
@@ -477,6 +512,17 @@ function smartWrite(id, title) {
   else improveSection(id, title);
 }
 
+// Return nearest filled section before/after id (skipping empty ones).
+function _getAdjacentSections(id) {
+  const idx = SECTIONS.findIndex(s => s.id === id);
+  const prevSec = SECTIONS.slice(0, idx).reverse().find(s => state.sections[s.id]?.prose?.trim());
+  const nextSec = SECTIONS.slice(idx + 1).find(s => state.sections[s.id]?.prose?.trim());
+  return {
+    prevSection: prevSec ? { title: prevSec.title, prose: state.sections[prevSec.id].prose } : null,
+    nextSection: nextSec ? { title: nextSec.title, prose: state.sections[nextSec.id].prose } : null,
+  };
+}
+
 function generateDraft(id, title) {
   if (!checkContextGrounding(id)) return;
   const notes = document.getElementById(`notes-${id}`)?.value || "";
@@ -484,10 +530,11 @@ function generateDraft(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
+  const { prevSection, nextSection } = _getAdjacentSections(id);
   const existingSections = SECTIONS
     .filter(s => s.id !== id && state.sections[s.id]?.prose?.trim())
     .map(s => ({ title: s.title, prose: state.sections[s.id].prose }));
-  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, articleType: state.articleType, existingSections }, id, "✨ Generated Draft", true, warn);
+  streamToAiBox("/api/generate", { sectionId: id, sectionTitle: title, notes, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, articleType: state.articleType, existingSections, prevSection, nextSection }, id, "✨ Generated Draft", true, warn);
 }
 
 function improveSection(id, title) {
@@ -498,7 +545,8 @@ function improveSection(id, title) {
   const pubmedContext = getSelectedPubmedContext();
   const userContext = state.sections[id]?.userContext || "";
   const warn = !hasSelectedRefs();
-  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle }, id, "✨ Improved Text", true, warn);
+  const { prevSection, nextSection } = _getAdjacentSections(id);
+  streamToAiBox("/api/improve", { sectionTitle: title, content, topic, pubmedContext, userContext, language: getLanguage(), writingStyle: state.writingStyle, prevSection, nextSection }, id, "✨ Improved Text", true, warn);
 }
 
 function getKeyPoints(id, title) {
@@ -709,7 +757,7 @@ function expandToProse(id, title) {
 
 function applyAiSuggestion(id) {
   const contentEl = document.getElementById(`ai-content-${id}`);
-  const suggestion = (contentEl?.innerText || contentEl?.textContent || "").trim();
+  const suggestion = (contentEl?.textContent || contentEl?.innerText || "").trim();
   if (!suggestion) return;
   const textarea = document.getElementById(`content-${id}`);
   if (textarea) {
@@ -738,7 +786,7 @@ function getLanguage() {
 }
 
 async function runGrammarCheck(id, title) {
-  const content = document.getElementById(`section-${id}`)?.value || "";
+  const content = document.getElementById(`content-${id}`)?.value || "";
   if (!content.trim()) {
     showToast("Add some content before running grammar check.", "error");
     return;
@@ -781,7 +829,7 @@ function renderGrammarResults(id, rawText) {
   }
   const lines = rawText.split("\n").filter(l => l.startsWith("ISSUE |"));
   const typeLabels = { PASSIVE_VOICE: "Passive Voice", LONG_SENTENCE: "Long Sentence", INFORMAL: "Informal", HEDGING: "Hedging" };
-  results.innerHTML = lines.map(line => {
+  const issueCards = lines.map(line => {
     const parts = line.split("|").map(p => p.trim());
     const type = parts[1] || "";
     const fragment = parts[2] || "";
@@ -792,6 +840,27 @@ function renderGrammarResults(id, rawText) {
       <div class="grammar-suggestion">${htmlEsc(suggestion)}</div>
     </div>`;
   }).join("");
+  // Store raw issues text on the element for use by applyGrammarFixes
+  results.dataset.rawIssues = lines.join("\n");
+  results.innerHTML = issueCards + `<div style="margin-top:10px">
+    <button class="btn btn-ai btn-sm" onclick="applyGrammarFixes('${id}')">✨ Apply fixes</button>
+  </div>`;
+}
+
+async function applyGrammarFixes(id) {
+  const content = document.getElementById(`content-${id}`)?.value || "";
+  const issues = document.getElementById(`grammar-results-${id}`)?.dataset.rawIssues || "";
+  const topic = getTopic();
+  const language = getLanguage();
+  const sectionTitle = SECTIONS.find(s => s.id === id)?.title || id;
+  await streamToAiBox(
+    "/api/grammar-fix",
+    { content, issues, topic, sectionTitle, language },
+    id,
+    "✨ Grammar fixes applied",
+    true
+  );
+  document.getElementById(`grammar-${id}`).style.display = "none";
 }
 
 function closeGrammarPanel(id) {
@@ -1427,6 +1496,7 @@ async function searchPubMed() {
     const data = await resp.json();
     pubmedArticles = data.articles || [];
     renderPubmedResults();
+    enrichPubmedResults();
   } catch (err) {
     resultsEl.innerHTML = `<div class="pubmed-empty" style="color:#ef4444">Error: ${err.message}</div>`;
   } finally {
@@ -1446,7 +1516,7 @@ function renderPubmedResults() {
     return `
     <div class="pubmed-article" id="pm-${i}">
       <div class="pubmed-article-title">${htmlEsc(a.title)}</div>
-      <div class="pubmed-article-meta">${htmlEsc(a.authors)} &bull; ${htmlEsc(a.journal)} ${htmlEsc(a.year)} &bull; PMID: ${htmlEsc(a.pmid)}</div>
+      <div class="pubmed-article-meta">${htmlEsc(a.authors)} &bull; ${htmlEsc(a.journal)} ${htmlEsc(a.year)} &bull; PMID: ${htmlEsc(a.pmid)} <span id="pm-oa-${i}" class="pm-oa-checking">checking...</span></div>
       <div class="pubmed-article-abstract" id="pm-abs-${i}">${htmlEsc(a.abstract || "No abstract available.")}</div>
       ${(a.abstract && a.abstract.length > 200) ? `<span class="pubmed-expand" onclick="toggleAbstract(${i})">Show more</span>` : ""}
       <div style="margin-top:6px">
@@ -1457,6 +1527,41 @@ function renderPubmedResults() {
       </div>
     </div>
   `}).join("");
+}
+
+async function enrichPubmedResults() {
+  if (!pubmedArticles.length) return;
+  try {
+    const resp = await fetch("/api/fetch-pmids", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pmids: pubmedArticles.map(a => a.pmid) }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const byPmid = {};
+    (data.found || []).forEach(a => { byPmid[a.pmid] = a; });
+
+    pubmedArticles.forEach((a, i) => {
+      const enriched = byPmid[a.pmid];
+      if (!enriched) return;
+      pubmedArticles[i] = { ...a, ...enriched };
+      const badge = document.getElementById(`pm-oa-${i}`);
+      if (!badge) return;
+      if (enriched.fullText) {
+        badge.className = "reflib-fulltext";
+        badge.textContent = "Full text";
+      } else {
+        badge.className = "reflib-abstract-only";
+        badge.textContent = "Abstract only";
+      }
+    });
+  } catch (_) {
+    pubmedArticles.forEach((_, i) => {
+      const badge = document.getElementById(`pm-oa-${i}`);
+      if (badge) badge.remove();
+    });
+  }
 }
 
 function toggleAbstract(i) {
@@ -1474,20 +1579,41 @@ function getSelectedPubmedContext() {
   return parts.join("\n\n---\n\n");
 }
 
-function insertReference(i) {
+async function insertReference(i) {
   const a = pubmedArticles[i];
   if (!a) return;
   if (state.library.find(e => e.pmid === a.pmid)) {
     showToast("Already in library.", "");
     return;
   }
+
+  const btn = document.getElementById(`pm-add-${i}`);
+  if (btn) {
+    btn.textContent = "Fetching...";
+    btn.disabled = true;
+  }
+
+  // Enrich with OA + full text data before adding to library
+  let enriched = { ...a };
+  try {
+    const resp = await fetch("/api/fetch-pmids", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pmids: [a.pmid] }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const found = data.found?.[0];
+      if (found) enriched = found;
+    }
+  } catch (_) { /* fall through with basic data */ }
+
   // Add to library, selected by default so it's active in AI context immediately
-  state.library.push({ ...a, refNumber: state.library.length + 1, selected: true });
+  state.library.push({ ...enriched, refNumber: state.library.length + 1, selected: true });
   renderLibrary();
   scheduleAutoSave();
 
   // Update button in PubMed results
-  const btn = document.getElementById(`pm-add-${i}`);
   if (btn) {
     btn.textContent = "✓ In Library";
     btn.disabled = true;
@@ -1532,7 +1658,8 @@ function toggleRefLib() {
 function switchRefTab(e, tab) {
   e.stopPropagation();
   document.getElementById("reflib-tab-references").style.display = tab === "references" ? "block" : "none";
-  document.getElementById("reflib-tab-pubmed").style.display = tab === "pubmed" ? "block" : "none";
+  document.getElementById("reflib-tab-pubmed").style.display    = tab === "pubmed"     ? "block" : "none";
+  document.getElementById("reflib-tab-rag").style.display       = tab === "rag"        ? "block" : "none";
   document.querySelectorAll(".reflib-tab").forEach(el => el.classList.remove("active"));
   e.target.classList.add("active");
 }
@@ -1584,12 +1711,13 @@ function renderLibrary() {
     <div class="reflib-item">
       <span class="reflib-num">[${e.refNumber}]</span>
       <div style="flex:1;min-width:0">
-        <div class="reflib-title">${htmlEsc(e.title || "")} ${e.isOA ? '<span class="reflib-oa">OA</span>' : ""}</div>
+        <div class="reflib-title">${htmlEsc(e.title || "")} ${e.fullText ? '<span class="reflib-fulltext">Full text</span>' : '<span class="reflib-abstract-only">Abstract only</span>'}</div>
         <div class="reflib-meta">${htmlEsc(e.authors || "")} &bull; ${htmlEsc(e.journal || "")} ${htmlEsc(e.year || "")} &bull; PMID: ${htmlEsc(e.pmid || "")}</div>
         <div class="reflib-actions">
           <button class="btn btn-outline btn-sm" onclick="toggleLibrarySelect('${e.pmid}')" id="libsel-${e.pmid}" style="${e.selected ? 'background:var(--ai);color:#fff;border-color:var(--ai)' : ''}">
             ${e.selected ? "✓ In AI" : "Use in AI"}
           </button>
+          ${!e.fullText ? `<label class="btn btn-outline btn-sm pdf-upload-label" id="pdf-lbl-${e.pmid}" title="Upload full text PDF to index in RAG">↑ PDF<input type="file" accept=".pdf" style="display:none" onchange="uploadPdf(this,'${e.pmid}')"></label>` : ""}
           <button class="btn btn-secondary btn-sm" onclick="removeFromLibrary('${e.pmid}')">✕</button>
         </div>
       </div>
@@ -1607,6 +1735,36 @@ function removeFromLibrary(pmid) {
   scheduleAutoSave();
 }
 
+async function uploadPdf(input, pmid) {
+  const file = input.files[0];
+  if (!file) return;
+  const label = document.getElementById(`pdf-lbl-${pmid}`);
+  if (label) { label.textContent = "Uploading..."; label.style.pointerEvents = "none"; }
+
+  const formData = new FormData();
+  formData.append("pdf", file);
+
+  try {
+    const resp = await fetch(`/api/rag/upload-pdf/${articleId}/${pmid}`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const data = await resp.json();
+
+    const entry = state.library.find(e => e.pmid === pmid);
+    if (entry) {
+      entry.fullText = "__uploaded__";
+      entry.tables   = new Array(data.tables_found).fill("");
+    }
+    renderLibrary();
+    showToast(`Indexed: ${data.tables_found} table${data.tables_found !== 1 ? "s" : ""}, ${Math.round(data.prose_chars / 1000)}k chars, ${data.pages} pages`, "success");
+  } catch (err) {
+    showToast("Upload failed: " + err.message, "error");
+    if (label) { label.textContent = "↑ PDF"; label.style.pointerEvents = ""; }
+  }
+}
+
 function toggleLibrarySelect(pmid) {
   const entry = state.library.find(e => e.pmid === pmid);
   if (entry) { entry.selected = !entry.selected; renderLibrary(); renderConfidenceBars(); }
@@ -1616,6 +1774,23 @@ function selectAllLibrary(val) {
   state.library.forEach(e => e.selected = val);
   renderLibrary();
   renderConfidenceBars();
+}
+
+async function reindexLibrary() {
+  if (!articleId) { showToast("No article loaded.", "error"); return; }
+  if (!state.library.length) { showToast("Library is empty.", ""); return; }
+  const btn = document.getElementById("reindex-btn");
+  if (btn) { btn.textContent = "Indexing..."; btn.disabled = true; }
+  try {
+    const resp = await fetch(`/api/rag/ingest/${articleId}`, { method: "POST" });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const data = await resp.json();
+    showToast(`Indexed ${data.indexed} paper${data.indexed !== 1 ? "s" : ""} into RAG`, "success");
+  } catch (err) {
+    showToast("Re-index failed: " + err.message, "error");
+  } finally {
+    if (btn) { btn.textContent = "⟳ Re-index RAG"; btn.disabled = false; }
+  }
 }
 
 // ── AI Confidence Indicator ──
@@ -2030,6 +2205,193 @@ function skipDraftSection(id) {
 function cancelFullDraft() {
   draftAbortController?.abort();
   document.getElementById("draft-progress-modal").classList.remove("open");
+}
+
+// ── Agentic RAG — "Ask Your Library" panel ───────────────────────────────────
+
+let _ragCurrentAnswer = "";
+let _ragCurrentCitations = [];
+let _ragActiveSectionId = null;  // section open when query was submitted
+
+function toggleRagPanel() {
+  openRagPanel();
+}
+
+function openRagPanel() {
+  // Expand the reference library panel if collapsed
+  const body = document.getElementById("reflib-body");
+  if (body && body.style.display === "none") toggleRefLib();
+  // Switch to the Ask Library tab
+  const ragTab = [...document.querySelectorAll(".reflib-tab")].find(t => t.textContent.includes("Ask Library"));
+  if (ragTab) ragTab.click();
+  document.getElementById("rag-question")?.focus();
+}
+
+function closeRagPanel() {
+  // no-op — panel is now a tab inside the reference library
+}
+
+function clearRagAnswer() {
+  _ragCurrentAnswer = "";
+  _ragCurrentCitations = [];
+  document.getElementById("rag-answer-area").style.display = "none";
+  document.getElementById("rag-answer").textContent = "";
+  document.getElementById("rag-thinking").textContent = "";
+  document.getElementById("rag-citations").style.display = "none";
+  document.getElementById("rag-citation-list").innerHTML = "";
+  document.getElementById("rag-insert-btn").style.display = "none";
+  document.getElementById("rag-status").textContent = "";
+}
+
+async function submitRagQuery() {
+  const question = document.getElementById("rag-question").value.trim();
+  if (!question) return;
+  if (!articleId) {
+    showToast("Save your article first before querying your library.", "error");
+    return;
+  }
+  if (!state.library || state.library.length === 0) {
+    showToast("Your library is empty. Add PubMed references first.", "error");
+    return;
+  }
+
+  clearRagAnswer();
+  document.getElementById("rag-answer-area").style.display = "";
+  document.getElementById("rag-submit-btn").disabled = true;
+  document.getElementById("rag-status").textContent = "Searching...";
+
+  // Derive active section from whichever section panel is currently open
+  const openPanel = document.querySelector(".section-panel.open");
+  const activeSectionId = openPanel ? openPanel.id.replace("section-", "") : null;
+  _ragActiveSectionId = activeSectionId;
+
+  let buf = "";
+  const decoder = new TextDecoder();
+
+  try {
+    const resp = await fetch("/api/rag/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, articleId, sectionId: activeSectionId }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || resp.statusText);
+    }
+
+    const reader = resp.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try { handleRagEvent(JSON.parse(line.slice(6))); } catch { /* ignore parse errors */ }
+      }
+    }
+  } catch (err) {
+    document.getElementById("rag-answer").textContent = "Error: " + err.message;
+  } finally {
+    document.getElementById("rag-submit-btn").disabled = false;
+    document.getElementById("rag-status").textContent = "";
+  }
+}
+
+function handleRagEvent(evt) {
+  switch (evt.type) {
+    case "thinking": {
+      const thinkEl = document.getElementById("rag-thinking");
+      const step = document.createElement("div");
+      step.className = "rag-thinking-step";
+      step.textContent = "⟳ " + evt.text;
+      thinkEl.appendChild(step);
+      break;
+    }
+    case "token": {
+      _ragCurrentAnswer += evt.text;
+      document.getElementById("rag-answer").textContent = _ragCurrentAnswer;
+      break;
+    }
+    case "citations": {
+      // Sources are already deduplicated by PMID on the server
+      _ragCurrentCitations = evt.sources || [];
+      const listEl = document.getElementById("rag-citation-list");
+      listEl.innerHTML = "";
+      _ragCurrentCitations.forEach(src => {
+        const chip = document.createElement("span");
+        chip.className = "rag-citation-chip";
+        chip.title = src.snippet || "";
+        chip.textContent = src.citeKey || `[${(src.authors || "").split(",")[0].trim().split(" ")[0]} et al., ${src.year || ""}]`;
+        listEl.appendChild(chip);
+      });
+      if (_ragCurrentCitations.length) {
+        document.getElementById("rag-citations").style.display = "";
+      }
+      break;
+    }
+    case "done": {
+      if (_ragCurrentAnswer) document.getElementById("rag-insert-btn").style.display = "";
+      break;
+    }
+    case "error": {
+      document.getElementById("rag-answer").innerHTML = `<span style="color:#ef4444">Error: ${evt.text}</span>`;
+      break;
+    }
+  }
+}
+
+function _ragCitationPlaceholder(src) {
+  // Use the server-generated citeKey if present, otherwise derive it
+  if (src.citeKey) return src.citeKey;
+  const firstAuthor = (src.authors || "").split(",")[0].trim().split(" ")[0] || src.title;
+  return src.year ? `[${firstAuthor} et al., ${src.year}]` : `[${firstAuthor}]`;
+}
+
+// Populate the AI suggestion box with pre-built content (no streaming needed).
+// Shows Apply + Refine row so user can accept, refine, or dismiss — same as streamed AI output.
+function showInAiBox(sectionId, content, label) {
+  openSection(sectionId);
+  const box = document.getElementById(`ai-${sectionId}`);
+  const contentEl = document.getElementById(`ai-content-${sectionId}`);
+  const actionsEl = document.getElementById(`ai-actions-${sectionId}`);
+  const labelEl = document.getElementById(`ai-label-${sectionId}`);
+  const refineRow = document.getElementById(`refine-row-${sectionId}`);
+  if (!box || !contentEl) return;
+  box.classList.add("visible");
+  labelEl.textContent = label;
+  contentEl.textContent = content;
+  contentEl.contentEditable = "true";
+  actionsEl.style.display = "";
+  if (refineRow) refineRow.style.display = "flex";
+}
+
+function insertRagAnswer() {
+  const sectionId = _ragActiveSectionId
+    || document.querySelector(".section-panel.open")?.id?.replace("section-", "");
+  if (!sectionId) {
+    showToast("Open a section first so we know where to insert.", "error");
+    return;
+  }
+  const textarea = document.getElementById(`content-${sectionId}`);
+  if (!textarea) return;
+
+  if (!textarea.value.trim()) {
+    showToast("Write some content in this section first, then use Ask Library to add supporting evidence.", "error");
+    return;
+  }
+
+  // Format citations as [Author et al., Year] — same style used throughout the article
+  const inlineCitations = _ragCurrentCitations.map(_ragCitationPlaceholder).join(" ");
+  const ragInsertion = _ragCurrentAnswer + (inlineCitations ? "\n\n" + inlineCitations : "");
+
+  // Stage the combined content in the AI suggestion box so user can Refine or Accept
+  const cur = textarea.value;
+  const combined = cur + (cur.endsWith("\n") ? "\n" : "\n\n") + ragInsertion;
+  showInAiBox(sectionId, combined, "🔎 Library answer — review and refine");
+  showToast("RAG answer staged in AI box — accept, refine, or dismiss.", "success");
 }
 
 fetch('/api/version').then(r => r.json()).then(v => {
