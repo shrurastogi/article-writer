@@ -7,8 +7,8 @@
 | Field | Value |
 |---|---|
 | Version | 3.0 |
-| Last Updated | 2026-04-10 |
-| Reflects | Sprint 6 delivered state |
+| Last Updated | 2026-04-25 |
+| Reflects | Sprint 8 delivered state |
 
 This document describes the **current** architecture. It is updated when the structure changes — not when features are planned.
 
@@ -18,7 +18,7 @@ This document describes the **current** architecture. It is updated when the str
 
 Medical Article Writer is a multi-user Node/Express web application backed by MongoDB Atlas and deployed on Railway. Users authenticate with Google OAuth or email/password and access a personal dashboard of articles stored server-side.
 
-Current file structure after Sprint 6:
+Current file structure after Sprint 8:
 
 ```
 article-writer/
@@ -42,15 +42,20 @@ article-writer/
 │   │   ├── auth.js            # Auth routes (Google OAuth + local)
 │   │   ├── export.js          # DOCX + PDF export
 │   │   ├── pubmed.js          # PubMed search + PMID fetch
+│   │   ├── rag.js             # RAG endpoints: query, ingest, upload-pdf, delete
 │   │   ├── settings.js        # User settings + BYOK key management
 │   │   └── versions.js        # Article version history
 │   ├── services/
+│   │   ├── embeddingService.js    # Mistral mistral-embed; BM25 fallback
 │   │   ├── encryptionService.js   # AES-256-GCM encrypt/decrypt
 │   │   ├── exportService.js       # DOCX document builder
 │   │   ├── llmService.js          # Groq client pool + createCompletion()
+│   │   ├── pdfExtractService.js   # Extract prose + tables from PDF buffer (pdf-parse v1)
 │   │   ├── pdfService.js          # Puppeteer PDF generation
+│   │   ├── pineconeService.js     # Pinecone v7 upsert/query/delete; BM25 fallback
 │   │   ├── pubmedService.js       # NCBI E-utilities + BioC full-text
-│   │   └── sectionContext.js      # Section-aware prompt context mapping
+│   │   ├── ragAgentService.js     # Intent classifier + tool-loop agent, SSE emitter
+│   │   └── sectionContext.js      # Section-aware prompt context + getSectionRequirements()
 │   └── utils/
 │       ├── detectWriteMode.js     # Detects bullet/prose write mode
 │       └── logger.js              # pino structured logger
@@ -113,6 +118,11 @@ article-writer/
 │  src/routes/ai.js       ──► src/services/llmService.js           │
 │                              (Groq API — key pool, rotation)     │
 │                                                                  │
+│  src/routes/rag.js      ──► src/services/ragAgentService.js      │
+│                         ──► src/services/pineconeService.js      │
+│                         ──► src/services/embeddingService.js     │
+│                         ──► src/services/pdfExtractService.js    │
+│                                                                  │
 │  src/routes/pubmed.js   ──► NCBI E-utilities + PMC BioC API      │
 │                                                                  │
 │  src/routes/export.js   ──► src/services/exportService.js (DOCX) │
@@ -120,14 +130,14 @@ article-writer/
 │                                                                  │
 │  GET /*                 ──► index.html (requireAuth guarded)     │
 └──────────────────────────────────────────────────────────────────┘
-                 │                          │
-   ┌─────────────▼───────────┐   ┌─────────▼──────────────┐
-   │     MongoDB Atlas       │   │       Groq API          │
-   │  users collection       │   │  llama-3.3-70b-         │
-   │  articles collection    │   │  versatile              │
-   │  articleversions coll.  │   │  (OpenAI-compatible)    │
-   │  sessions collection    │   └────────────────────────┘
-   └─────────────────────────┘
+        │                    │                    │
+┌───────▼────────┐  ┌────────▼───────┐  ┌────────▼────────────────┐
+│  MongoDB Atlas │  │   Groq API     │  │  Pinecone (serverless)  │
+│  users         │  │  llama-3.3-70b │  │  index: article-writer  │
+│  articles      │  │  versatile     │  │  + Mistral mistral-embed │
+│  versions      │  │  (OpenAI-compat│  │    (embedding API)      │
+│  sessions      │  └────────────────┘  └─────────────────────────┘
+└────────────────┘
 ```
 
 ---
@@ -206,7 +216,10 @@ Protected: /api/articles/*, /api/generate*, /api/pubmed*, /api/export*, GET /
   authors: String,
   keywords: String,
   sections: Mixed,                // { [sectionId]: { prose: String, tables: [] } }
-  library: Array,                 // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA, fullText, selected }]
+  library: Array,                 // [{ pmid, title, authors, year, journal, abstract, pmcid, isOA,
+                                 //    fullText: String,   // prose extracted from uploaded PDF
+                                 //    tables: [String],   // markdown tables extracted from PDF
+                                 //    selected: Boolean }]
   customSections: Array,          // [{ id, title, position }]
   wordCount: Number,
   isLocked: Boolean (default: false),
@@ -291,7 +304,10 @@ const state = {
 
 **Citation Linking:** `enhanceCitations(text, library)` converts `[Author et al., YYYY]` patterns to superscript links in the preview pane.
 
-**Reference Library:** Collapsible panel with two tabs — References (PMID import) and PubMed Search.
+**Reference Library:** Collapsible panel with three tabs:
+- **References** — PMID import, library list with Full-text/Abstract-only badges, per-paper ↑ PDF upload, "⟳ Re-index RAG" button
+- **PubMed Search** — keyword search with OA enrichment badges (Full text / Abstract only)
+- **Ask Library** — natural language RAG query; intent classification → Pinecone retrieval → streamed answer + source citations → "Insert into section" button
 
 **Version History:** `saveVersionManual()` and `openVersionHistory()` call `ensureArticleSaved()` first to guarantee the article exists in the DB before creating/listing versions.
 
@@ -351,16 +367,26 @@ const state = {
 
 | Endpoint | Description | Max Tokens |
 |---|---|---|
-| /api/generate | Section draft | 1800 |
+| /api/generate | Section draft | varies (from `getSectionRequirements`) |
 | /api/improve | Improve existing prose | 1800 |
 | /api/keypoints | Key points to cover | 900 |
 | /api/refine | Refine with instruction | 1800 |
 | /api/generate-table | HTML table | 1200 |
 | /api/coherence-check | Full-article flow analysis | 1500 |
 | /api/coherence-fix | Context-aware section rewrite using adjacent sections | 1800 |
-| /api/grammar-check | Grammar + style issues per section | 800 |
+| /api/grammar-check | Grammar + style issues per section (ISSUE \| TYPE \| fragment \| suggestion lines) | 500 |
+| /api/grammar-fix | Apply grammar issues to section text — minimal targeted corrections | 2000 |
 | /api/suggest-sections | Suggest section titles (JSON, not streamed) | — |
 | /api/agent/draft | Multi-section draft (SSE, `text/event-stream`) | — |
+
+### RAG Endpoints (`src/routes/rag.js`, rate-limited)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | /api/rag/query | SSE stream: intent classify → Pinecone top-8 → synthesis → `{type, text/pmid/title}` events |
+| POST | /api/rag/ingest/:articleId | Re-index all library papers for article into Pinecone |
+| DELETE | /api/rag/article/:articleId | Delete all Pinecone vectors for an article |
+| POST | /api/rag/upload-pdf/:articleId/:pmid | Upload PDF (multipart, max 20 MB); extract prose + tables; delete stale vectors; re-index |
 
 All AI calls use `createCompletion()` from `src/services/llmService.js`. This wraps `openai` npm package pointed at `https://api.groq.com/openai/v1` with automatic round-robin rotation across `GROQ_API_KEY` through `GROQ_API_KEY_4` on HTTP 429 responses.
 
@@ -461,6 +487,43 @@ User clicks "Save Version"
   → If count > 50: oldest version deleted
 ```
 
+### PDF Upload + Pinecone Indexing
+
+```
+User clicks ↑ PDF on a library entry
+  → uploadPdf(input, pmid) — FormData POST to /api/rag/upload-pdf/:articleId/:pmid
+  → multer memoryStorage (max 20 MB, application/pdf only)
+  → extractFromPdf(buffer) — pdfExtractService.js
+      → pdf-parse v1 → raw text
+      → heuristic table detection (≥2 space-delimited columns, ≥3 rows) → markdown tables
+  → article.library[pmid].fullText = prose
+  → article.library[pmid].tables = tables[]
+  → article.save()
+  → deletePaperVectors(articleId, pmid) — query Pinecone by pmid filter → delete by IDs
+  → setImmediate → upsertPaper(articleId, updatedPaper)
+      → build chunks: abstract chunk + prose chunks (2000-char sliding window) + table chunks
+      → embed each chunk via Mistral mistral-embed (or BM25 score if no key)
+      → Pinecone upsert in batches of 100
+  → Response: { ok, prose_chars, tables_found, pages }
+  → renderLibrary() — updates badge to "Full text"
+```
+
+### Agentic RAG Query
+
+```
+User submits question in Ask Library tab
+  → submitRagQuery() — POST /api/rag/query { question, articleId, sectionId }
+  → runAgentWorkflow(question, articleId, sectionId, user, article)
+      → intent classification prompt → GENERAL | SECTION_SPECIFIC | COMPARISON | STATS
+      → embed question via Mistral mistral-embed (or BM25 keyword match)
+      → queryVectors(articleId, embedding, topK=8) — Pinecone query with articleId filter
+      → Build synthesis prompt: question + intent + top chunks with source metadata
+      → createCompletionForUser({ stream: true }) — Groq
+      → Parse SSE events from stream: thinking / answer / citation / done
+  → SSE → client: { type, text } events
+  → UI: streams answer into rag-answer div; renders citation badges; enables Insert button
+```
+
 ---
 
 ## 9. Key Design Decisions
@@ -478,6 +541,10 @@ User clicks "Save Version"
 | AES-256-GCM for BYOK keys | Symmetric encryption; `ENCRYPTION_KEY` env var is the single secret. Keys are never returned in API responses |
 | `/api/coherence-fix` separate from `/api/refine` | Coherence fix needs adjacent section context; `/api/refine` is a generic instruction-following endpoint. Keeping them separate avoids polluting the refine prompt with optional context parameters |
 | Sprint 3 modular refactor | `server.js` monolith split into `src/` modules for testability and maintainability. Routes are thin; business logic lives in services |
+| Pinecone over LanceDB | Pinecone serverless has no Railway disk/RAM footprint. LanceDB requires a writable persistent filesystem — incompatible with Railway's ephemeral container model |
+| Query-then-delete-by-IDs for Pinecone | Pinecone serverless does not support delete-by-metadata-filter. `deletePaperVectors` queries by `pmid` filter to collect IDs, then deletes by ID list |
+| BM25 fallback in RAG | RAG must function without a Mistral key (local dev, free tier). BM25 keyword scoring over paper text provides reasonable retrieval when no embedding provider is configured |
+| `getSectionRequirements()` centralises generation rules | Per-section prompt rules (max tokens, citation suppression, journal-style requirements) live in `sectionContext.js` and are consumed by both `/api/generate` and `/api/agent/draft` — single source of truth for AI quality constraints |
 
 ---
 
@@ -485,7 +552,9 @@ User clicks "Save Version"
 
 | Sprint | Change |
 |---|---|
-| Sprint 7 | Article Planner — 3-step wizard (Research, Structure, Publication Strategy). Web search integration. New planner routes. See `docs/sprints/SPRINT-7.md` |
-| Sprint 7 | LaTeX export endpoint (`/api/export-latex`) |
-| Sprint 8 | Mastra agent orchestration. Socket.io + CRDT real-time collaboration |
-| Sprint 8 | `VectorStoreAdapter` + `EmbeddingAdapter` for RAG. LanceDB embedded vector store. File upload storage |
+| Future | LaTeX export endpoint (`/api/export-latex`) |
+| Future | Mastra multi-agent orchestration replacing custom tool-loop in `ragAgentService.js` |
+| Future | Socket.io + CRDT real-time collaboration |
+| Future | Claude + Gemini LLM provider adapters (separate SDK, not OpenAI-compatible) |
+| Future | Dimensions.ai + Semantic Scholar search integrations |
+| Future | Article Planner — 3-step wizard (Research, Structure, Publication Strategy) |

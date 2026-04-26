@@ -8,7 +8,7 @@
 |---|---|
 | Product | Medical Article Writer |
 | Version | 2.0 |
-| Last Updated | 2026-04-10 |
+| Last Updated | 2026-04-25 |
 | Status | Living Document |
 
 **How to use this document:** Features marked ✅ are shipped. Features marked 📋 are planned. Add new requirements under the relevant module or in Section 9 (Roadmap). Each requirement has a short ID (e.g. `F2-3`) for cross-referencing.
@@ -126,7 +126,7 @@ All AI calls stream responses token-by-token into the AI suggestion box. The sug
 
 | ID | Feature | Description | Status |
 |---|---|---|---|
-| F4-1 | Reference Library Panel | Collapsible panel with two tabs: References and PubMed Search | ✅ |
+| F4-1 | Reference Library Panel | Collapsible panel with three tabs: References, PubMed Search, and Ask Library (RAG) | ✅ |
 | F4-2 | PMID Import | Paste comma- or newline-separated PMIDs; fetch metadata + OA full-text from NCBI in batch | ✅ |
 | F4-3 | OA Full-text Enrichment | For Open Access papers, fetches full-text via PMC BioC API (intro, results, discussion, conclusion, abstract) up to 6000 chars | ✅ |
 | F4-4 | OA Badge | Library entries sourced from OA papers display an "OA" badge | ✅ |
@@ -361,10 +361,10 @@ flowchart TD
 | Streaming | All AI endpoints use chunked transfer encoding (`text/plain`) |
 | PDF | `puppeteer-core` + system Chromium (server-side primary, Sprint 4). `html2pdf.js` client-side fallback |
 | DOCX | Server-side via `docx` npm package |
-| Vector store | LanceDB (embedded, default, Sprint 7); Qdrant/Weaviate via switchable `VectorStoreAdapter` (Sprint 7) |
-| Embeddings | HuggingFace `BAAI/bge-small-en` (default, free, Sprint 7); OpenAI / Cohere / VoyageAI via switchable `EmbeddingAdapter` (Sprint 7) |
-| Agent framework | Mastra (Sprint 8) |
-| MCP | Custom MCP servers: PubMed, Dimensions, quality-check, article-writer, Tavily web search, ClinicalTrials.gov (Sprint 8) |
+| Vector store | Pinecone serverless (`@pinecone-database/pinecone@7.2.0`). Index: `article-writer`. Requires `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` env vars |
+| Embeddings | Mistral `mistral-embed` (1024-dim). Requires `MISTRAL_API_KEY`. BM25 keyword fallback when no key is set |
+| Agent framework | Custom tool-loop agent in `src/services/ragAgentService.js` (Sprint 8). Mastra multi-agent pipeline planned (future) |
+| MCP | Custom MCP servers: PubMed, Dimensions, quality-check, article-writer, Tavily web search, ClinicalTrials.gov (planned future) |
 | Section content | Each section stores `{ prose: string, tables: [] }`. Max ~2000 chars per section sent to coherence check |
 
 ---
@@ -396,6 +396,9 @@ flowchart TD
 | `PORT` | `3000` | Set by Railway |
 | `BUILD_SHA` | Set by CI (GitHub Actions) | Set by CI (GitHub Actions) |
 | `ENCRYPTION_KEY` | Any 32-char string | 32-byte random hex (for BYOK key encryption) |
+| `PINECONE_API_KEY` | Pinecone API key | Same key used in both dev and prod (single serverless index) |
+| `PINECONE_INDEX_NAME` | `article-writer` | Pinecone index name |
+| `MISTRAL_API_KEY` | Mistral API key | Used for `mistral-embed` embeddings. BM25 fallback if absent |
 
 ### File structure
 
@@ -531,11 +534,14 @@ Production loads `.env`; development loads `.env.development`; test environment 
 
 | ID | Feature | Description | Sprint |
 |---|---|---|---|
-| F16-1 | Document Upload | Upload PDF/Word files server-side, stored per-user per-article. Initial storage: local filesystem; cloud blob storage later | 📋 7 |
-| F16-2 | PDF/Word Text Extraction | Extract text from uploaded files via `pdf-parse`. Text chunked for downstream embedding and AI context | 📋 7 |
-| F16-3 | Vector Embeddings | Chunk text → embed via switchable `EmbeddingAdapter`. Default: HuggingFace `BAAI/bge-small-en` (free). Options: OpenAI `text-embedding-3-small`, Cohere, VoyageAI (recommended for scientific text) | 📋 7 |
-| F16-4 | Vector Store | Store and query embeddings via switchable `VectorStoreAdapter`. Default: LanceDB (embedded, no extra server, Node.js-native). Options: Qdrant (self-hosted or free cloud), Weaviate | 📋 7 |
-| F16-5 | RAG Pipeline | Semantic search over uploaded docs + PubMed results. Top-K chunks injected into AI prompts as context. Grounding constraint (F3-13) applies equally to RAG-retrieved chunks | 📋 8 |
+| F16-1 | Per-paper Full-text Badge | Library entries show "Full text" (green) or "Abstract only" (grey) badge based on whether a full text has been extracted and stored | ✅ Sprint 8 |
+| F16-2 | PDF Upload + Text Extraction | Per-paper ↑ PDF button in Reference Library. Extracts prose and markdown-formatted tables from uploaded PDF (`pdf-parse@1.1.1`). Stored as `library[pmid].fullText` and `library[pmid].tables` in MongoDB | ✅ Sprint 8 |
+| F16-3 | Vector Embeddings | Chunks embedded via Mistral `mistral-embed` (1024-dim, `MISTRAL_API_KEY`). BM25 keyword scoring used as fallback when no embedding key is configured | ✅ Sprint 8 |
+| F16-4 | Vector Store | Pinecone serverless (`@pinecone-database/pinecone@7.2.0`). Index: `article-writer`, namespace per user. Each chunk stored with `articleId`, `pmid`, `chunkType` (prose/abstract/table), and `chunkIndex` metadata. Delete uses query-then-delete-by-IDs pattern (Pinecone serverless does not support delete by metadata filter) | ✅ Sprint 8 |
+| F16-5 | Re-index RAG | "⟳ Re-index RAG" button in References tab. Calls `POST /api/rag/ingest/:articleId` to delete stale vectors and re-upsert all library papers | ✅ Sprint 8 |
+| F16-6 | Agentic RAG Pipeline ("Ask Library") | Third tab in Reference Library. User submits a natural language question → intent classification (GENERAL / SECTION_SPECIFIC / COMPARISON / STATS) → Pinecone top-8 semantic search (or BM25 fallback) → tool-augmented synthesis prompt → Groq streams answer with inline citations → SSE events (`thinking`, `answer`, `citation`, `done`) | ✅ Sprint 8 |
+| F16-7 | Insert RAG Answer | After a RAG answer streams in, "Insert into section ↓" button inserts the answer into the active section's AI suggestion box | ✅ Sprint 8 |
+| F16-8 | Word/Dimensions Document Upload | Upload Word files; Dimensions.ai integration for broader bibliometric coverage | 📋 Future |
 
 ---
 
@@ -543,9 +549,11 @@ Production loads `.env`; development loads `.env.development`; test environment 
 
 | ID | Feature | Description | Sprint |
 |---|---|---|---|
-| F17-1 | Grammar & Style Check | New `POST /api/grammar-check` endpoint (Groq-powered). Checks passive voice, sentence length, academic register, hedging, formality. Section-by-section report panel | 📋 5 |
-| F17-2 | EQUATOR Checklist Validation | Auto-fill structured reporting checklists from article content: CONSORT (RCT), PRISMA (systematic review), STROBE (observational). Manual checklist items with checkboxes for items AI cannot auto-assess | 📋 7 |
-| F17-3 | Journal-specific Formatting Check | User selects target journal. AI checks article against journal style guide (word count limits, required sections, reference format, abstract structure) | 📋 7 |
+| F17-1 | Grammar & Style Check | `POST /api/grammar-check` (Groq-powered). Checks passive voice, sentence length, academic register, hedging. Section-by-section report panel with issue cards | ✅ |
+| F17-2 | Grammar AI Apply Fixes | "✨ Apply fixes" button on grammar results panel. Calls `POST /api/grammar-fix` — streams minimally-corrected section text into AI suggestion box. User accepts/rejects as normal | ✅ Sprint 8 |
+| F17-3 | Section-specific Journal Rules | Every AI generation call uses section-specific prompt rules (`getSectionRequirements`): abstract citation prohibition, introduction paragraph structure, discussion limitations mandate, methods/results original-research rules, universal academic writing rules across all sections | ✅ Sprint 8 |
+| F17-4 | EQUATOR Checklist Validation | Auto-fill structured reporting checklists from article content: CONSORT (RCT), PRISMA (systematic review), STROBE (observational). Manual checklist items with checkboxes for items AI cannot auto-assess | 📋 7 |
+| F17-5 | Journal-specific Formatting Check | User selects target journal. AI checks article against journal style guide (word count limits, required sections, reference format, abstract structure) | 📋 7 |
 
 ---
 
@@ -632,3 +640,7 @@ Both agentic modes coexist permanently alongside the existing manual incremental
 | 2026-04-04 | D13 — Railway: one Hobby account, two projects | Dev project → `dev` branch (auto-deploy), prod project → `main` branch. Same codebase; different env vars. Semantic-release ensures dev shows `v1.0.0-dev.1 · sha` and prod shows `v1.0.0 · sha` |
 | 2026-04-04 | D14 — Switchable adapters for vector stores and embeddings | `VectorStoreAdapter` and `EmbeddingAdapter` interfaces enable switching without changing RAG pipeline code. VoyageAI recommended for scientific text quality |
 | 2026-04-04 | D15 — Writing style capture is per-article, not per-user | Style stored on `article.writingStyle` because each article may have a different target journal, co-authors, and voice requirements |
+| 2026-04-25 | D16 — Pinecone serverless over LanceDB | LanceDB requires disk persistence which conflicts with Railway's ephemeral filesystem. Pinecone serverless has no RAM/disk overhead and scales without infra changes |
+| 2026-04-25 | D17 — BM25 fallback for RAG | RAG must work even without a Mistral key (local dev, free tier). BM25 over paper abstracts provides meaningful keyword retrieval when no embedding service is configured |
+| 2026-04-25 | D18 — Ask Library as third Reference Library tab | Placing the RAG panel as a tab inside the Reference Library (not a floating panel) keeps all paper-related actions in one place and avoids a second always-visible panel competing for screen space |
+| 2026-04-25 | D19 — Section-specific generation rules in `getSectionRequirements()` | Centralising per-section prompt rules (abstract citation prohibition, discussion limitations mandate, methods/results CONSORT/STROBE rules) in `sectionContext.js` ensures consistent enforcement across both `/api/generate` and `/api/agent/draft` without duplicating logic |
