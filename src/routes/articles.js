@@ -6,6 +6,7 @@ const Article = require("../models/Article");
 const User = require("../models/User");
 const logger = require("../utils/logger");
 const { requireApiAuth } = require("../middleware/auth");
+const { upsertPaper, deleteArticleVectors } = require("../services/pineconeService");
 
 const router = express.Router();
 
@@ -71,13 +72,16 @@ router.put("/:id", async (req, res) => {
 
     if (article.isLocked) return res.status(423).json({ error: "Article is locked." });
 
-    const { title, topic, authors, keywords, sections, library, customSections, language, writingStyle } = req.body;
+    const { title, topic, authors, keywords, articleType, sections, library, customSections, language, writingStyle } = req.body;
 
     if (title !== undefined)         article.title = title;
     if (topic !== undefined)         article.topic = topic;
     if (authors !== undefined)       article.authors = authors;
     if (keywords !== undefined)      article.keywords = keywords;
+    if (articleType !== undefined)   article.articleType = articleType;
     if (sections !== undefined)      article.sections = sections;
+    // Detect newly added papers before overwriting library
+    const prevPmids = new Set((article.library || []).map(p => p.pmid).filter(Boolean));
     if (library !== undefined)       article.library = library;
     if (customSections !== undefined) article.customSections = customSections;
     if (language !== undefined)      article.language = language;
@@ -91,6 +95,17 @@ router.put("/:id", async (req, res) => {
     article.markModified("library");
 
     await article.save();
+
+    // Background: ingest new papers into Pinecone (fire-and-forget, never blocks response)
+    if (library !== undefined) {
+      const newPapers = library.filter(p => p.pmid && !prevPmids.has(p.pmid));
+      if (newPapers.length) {
+        setImmediate(() => {
+          newPapers.forEach(paper => upsertPaper(req.params.id, paper, req.user).catch(() => {}));
+        });
+      }
+    }
+
     res.json({ article });
   } catch (err) {
     logger.error({ msg: "Update article error", error: err.message, articleId: req.params.id });
@@ -239,6 +254,8 @@ router.delete("/:id", async (req, res) => {
 
     await article.deleteOne();
     logger.info({ msg: "Article deleted", articleId: req.params.id, userId: req.user._id.toString() });
+    // Background: clean up Pinecone vectors
+    setImmediate(() => deleteArticleVectors(req.params.id).catch(() => {}));
     res.status(204).send();
   } catch (err) {
     logger.error({ msg: "Delete article error", error: err.message, articleId: req.params.id });

@@ -476,8 +476,27 @@ Check a section for grammar and style issues (passive voice, long sentences, inf
   "language": "string (optional, default: English)"
 }
 ```
-**Response:** `text/plain` stream. Each issue on its own line: `ISSUE | TYPE | fragment | suggestion`. Returns `NO_ISSUES` if none found.
+**Response:** `text/plain` stream. Each issue on its own line: `ISSUE | TYPE | fragment | suggestion`. Returns `NO_ISSUES` if none found. Maximum 5 issues per check.  
+Issue types: `PASSIVE_VOICE`, `LONG_SENTENCE`, `INFORMAL`, `HEDGING`.  
 **Errors:** `400` missing content.
+
+---
+
+### POST /api/grammar-fix
+Apply a set of grammar/style issues to section text. Makes only targeted corrections — does not rewrite, expand, or change content beyond what is needed to resolve each issue.
+
+**Request**
+```json
+{
+  "content": "string (required) — current section prose",
+  "issues": "string (required) — newline-separated ISSUE | TYPE | fragment | suggestion lines from /api/grammar-check",
+  "topic": "string (optional)",
+  "sectionTitle": "string (optional)",
+  "language": "string (optional, default: English)"
+}
+```
+**Response:** `text/plain` stream of the corrected section text.  
+**Errors:** `400` missing content or issues.
 
 ---
 
@@ -567,6 +586,81 @@ Max 50 PMIDs per request. Non-numeric values are silently filtered.
 }
 ```
 **Errors:** `400` invalid or empty pmids array; `500` NCBI unavailable.
+
+---
+
+## RAG Endpoints
+
+All RAG endpoints require an active session. Rate-limited alongside AI endpoints.
+
+### POST /api/rag/query
+Run an agentic natural language query against the article's vector library. Streams results as SSE events.
+
+**Request**
+```json
+{
+  "question": "string (required)",
+  "articleId": "string (required)",
+  "sectionId": "string (optional) — active section for SECTION_SPECIFIC intent"
+}
+```
+**Response:** `text/event-stream`. Each line: `data: <JSON>\n\n`
+
+Events:
+```json
+{ "type": "thinking", "text": "Classifying intent..." }
+{ "type": "answer", "text": "streamed answer chunk" }
+{ "type": "citation", "pmid": "12345678", "title": "Paper title" }
+{ "type": "done" }
+{ "type": "error", "text": "Human-readable error message" }
+```
+Intent types resolved internally: `GENERAL`, `SECTION_SPECIFIC`, `COMPARISON`, `STATS`.  
+Retrieval: Pinecone top-8 semantic search (Mistral embeddings) or BM25 keyword fallback.  
+**Errors:** `400` missing question or articleId; `404` article not found.
+
+---
+
+### POST /api/rag/ingest/:articleId
+Re-index all library papers for an article into Pinecone. Existing vectors are overwritten (delete-then-upsert per paper).
+
+**Response**
+```json
+{ "indexed": 12 }
+```
+**Errors:** `404` article not found; `500` Pinecone or embedding error.
+
+---
+
+### DELETE /api/rag/article/:articleId
+Delete all Pinecone vectors associated with an article (e.g. before deleting the article itself).
+
+**Response**
+```json
+{ "ok": true }
+```
+**Errors:** `404` article not found; `500` Pinecone error.
+
+---
+
+### POST /api/rag/upload-pdf/:articleId/:pmid
+Upload a PDF for a specific library paper, extract text and tables, and index in Pinecone.
+
+**Request:** `multipart/form-data`  
+- Field name: `pdf`  
+- Max file size: 20 MB  
+- Accepted MIME type: `application/pdf`
+
+**Response**
+```json
+{
+  "ok": true,
+  "prose_chars": 42350,
+  "tables_found": 3,
+  "pages": 12
+}
+```
+The extracted prose is saved to `article.library[pmid].fullText` and tables to `article.library[pmid].tables` in MongoDB. Stale Pinecone vectors for this paper are deleted before re-indexing.  
+**Errors:** `400` no PDF provided or wrong MIME type; `404` article or paper not found; `500` extraction or indexing failure.
 
 ---
 

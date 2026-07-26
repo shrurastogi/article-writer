@@ -105,6 +105,7 @@ app.use("/api", aiRateLimit, require("./routes/ai"));
 app.use("/api", require("./routes/pubmed"));
 app.use("/api", require("./routes/export"));
 app.use("/api", require("./routes/settings"));
+app.use("/api/rag", aiRateLimit, require("./routes/rag"));
 
 app.get("/api/version", (req, res) => {
   res.json({

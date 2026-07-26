@@ -65,6 +65,14 @@
           <label>Keywords <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label>
           <input type="text" id="keywords" placeholder="Multiple myeloma, plasma cell disorder, IMiD, proteasome inhibitor, CAR-T, bispecific antibody" oninput="updateMeta()" />
         </div>
+        <div class="form-group">
+          <label>Article Type</label>
+          <div class="article-type-selector" role="group">
+            <label class="type-option"><input type="radio" name="article-type" value="review" checked onchange="onArticleTypeChange(this.value)"><span>Review Article</span></label>
+            <label class="type-option"><input type="radio" name="article-type" value="original_research" onchange="onArticleTypeChange(this.value)"><span>Original Research</span></label>
+            <label class="type-option"><input type="radio" name="article-type" value="perspective" onchange="onArticleTypeChange(this.value)"><span>Perspective</span></label>
+          </div>
+        </div>
         <div class="form-group" style="margin-bottom:0">
           <label>Output Language</label>
           <select id="language-select" onchange="updateMeta()">
@@ -78,28 +86,15 @@
             <option value="Mandarin Chinese">Mandarin Chinese</option>
             <option value="Arabic">Arabic</option>
           </select>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="checkbox" id="strict-mode-toggle" onchange="onStrictModeChange()" />
+            <label for="strict-mode-toggle" style="margin:0;font-size:0.82rem;color:var(--secondary);cursor:pointer">Strict mode — require references for AI generation</label>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-          <input type="checkbox" id="strict-mode-toggle" onchange="onStrictModeChange()" />
-          <label for="strict-mode-toggle" style="margin:0;font-size:0.82rem;color:var(--secondary);cursor:pointer">Strict mode — require references for AI generation</label>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:0.8rem;color:var(--muted)">
+          Writing style: <strong id="active-style-name" style="color:var(--secondary)">Loading…</strong>
+          <a href="/settings" style="color:var(--ai);text-decoration:none;margin-left:2px" title="Change in Settings">Change ↗</a>
         </div>
-      </div>
-    </div>
-
-    <!-- Writing Style Calibration -->
-    <div class="panel" style="margin-bottom:12px;border-color:#c4b5fd">
-      <div class="panel-header" style="cursor:pointer;background:#f5f3ff" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-        <span class="panel-title" style="color:#6d28d9">Writing Style</span>
-        <span style="font-size:0.75rem;color:var(--muted)">optional — personalises AI output</span>
-      </div>
-      <div class="panel-body" id="style-panel-body">
-        <p style="font-size:0.82rem;color:var(--secondary);margin:0 0 10px">Paste a sample of your writing (100+ chars) and click <strong>Calibrate</strong>. The AI will match your tone, formality, and sentence rhythm.</p>
-        <div class="form-group">
-          <label>Sample Text</label>
-          <textarea id="style-sample" rows="4" placeholder="Paste a paragraph from a paper you've written…" style="font-size:0.82rem"></textarea>
-        </div>
-        <button id="calibrate-btn" class="btn btn-sm" style="background:#7c3aed;color:#fff;margin-bottom:12px" onclick="calibrateStyle()">Calibrate</button>
-        <div id="style-card" style="display:none"></div>
       </div>
     </div>
 
@@ -116,6 +111,7 @@
         <div class="reflib-tabs">
           <button class="reflib-tab active" onclick="switchRefTab(event,'references')">References</button>
           <button class="reflib-tab" onclick="switchRefTab(event,'pubmed')">PubMed Search</button>
+          <button class="reflib-tab" onclick="switchRefTab(event,'rag')">🔎 Ask Library</button>
         </div>
         <!-- References tab -->
         <div id="reflib-tab-references" style="padding:14px 18px">
@@ -126,6 +122,7 @@
             <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(true)">Select All</button>
             <button class="btn btn-secondary btn-sm" onclick="selectAllLibrary(false)">Deselect All</button>
             <button class="btn btn-secondary btn-sm" onclick="syncReferencesSection()">↺ Sync References</button>
+            <button class="btn btn-secondary btn-sm" id="reindex-btn" onclick="reindexLibrary()" title="Re-index all library papers into Pinecone for RAG search">⟳ Re-index RAG</button>
           </div>
           <div id="reflib-list" class="reflib-list">
             <div class="reflib-empty">No references yet. Paste PMIDs above or add from PubMed search results.</div>
@@ -141,12 +138,38 @@
             <div class="pubmed-empty">Search PubMed for references. Results will appear here.</div>
           </div>
         </div>
+        <!-- Ask Your Library tab -->
+        <div id="reflib-tab-rag" style="display:none;padding:14px 18px">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">Query your PubMed library with natural language — AI retrieves relevant evidence and streams a cited answer.</div>
+          <textarea id="rag-question" rows="2" placeholder="e.g. What do trials say about dosing?&#10;Compare efficacy vs safety outcomes..." style="resize:vertical;min-height:52px;width:100%;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+            <button class="btn btn-ai btn-sm" id="rag-submit-btn" onclick="submitRagQuery()">Search</button>
+            <span id="rag-status" style="font-size:0.78rem;color:var(--muted);font-style:italic"></span>
+          </div>
+          <div id="rag-answer-area" style="display:none">
+            <div style="font-size:0.82rem;font-weight:600;color:var(--secondary);margin-bottom:6px">Answer</div>
+            <div id="rag-thinking" style="font-size:0.78rem;color:var(--muted);font-style:italic;margin-bottom:6px"></div>
+            <div id="rag-answer" class="rag-answer-box"></div>
+            <div id="rag-citations" style="margin-top:10px;display:none">
+              <div style="font-size:0.78rem;font-weight:600;color:var(--secondary);margin-bottom:5px">Sources</div>
+              <div id="rag-citation-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" id="rag-insert-btn" style="display:none" onclick="insertRagAnswer()">Insert into section ↓</button>
+              <button class="btn btn-secondary btn-sm" onclick="clearRagAnswer()">Clear</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Article sections (accordion) -->
+    <div style="display:flex;justify-content:flex-end;padding:4px 0 2px;gap:6px">
+      <button class="btn btn-secondary btn-sm" onclick="clearAll()" style="font-size:0.78rem">Clear All Sections</button>
+      <button class="btn btn-secondary btn-sm" onclick="collapseAllSections()" style="font-size:0.78rem" title="Collapse all sections">⊖ Collapse All</button>
+    </div>
     <div id="sections-container"></div>
-    <div style="text-align:center;margin:10px 0 4px">
+    <div style="display:flex;justify-content:center;gap:8px;margin:10px 0 4px">
       <button class="btn btn-outline" onclick="openAddSectionModal()">+ Add Section</button>
     </div>
 
@@ -164,6 +187,7 @@
       </div>
     </div>
 
+
   </div>
 
   <!-- RIGHT: Preview -->
@@ -172,8 +196,6 @@
       <span class="panel-title">Article Preview</span>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="total-wc" id="total-wc">0 words</span>
-        <button class="btn btn-ai btn-sm" id="full-draft-btn" onclick="startFullDraft()">✨ Write Full Article</button>
-        <button class="btn btn-secondary btn-sm" onclick="clearAll()">Clear All</button>
         <button class="btn btn-secondary btn-sm" onclick="downloadDOCX()">⬇ DOCX</button>
         <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ PDF</button>
       </div>
@@ -189,17 +211,6 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Full Draft Progress Modal -->
-<div class="modal-overlay" id="draft-progress-modal">
-  <div class="draft-progress-box">
-    <div class="draft-progress-title">✨ Writing Full Article</div>
-    <div class="draft-progress-subtitle" id="draft-progress-subtitle">Generating drafts for each section…</div>
-    <div class="draft-section-list" id="draft-section-list"></div>
-    <div style="margin-top:16px;text-align:right">
-      <button class="btn btn-secondary btn-sm" onclick="cancelFullDraft()">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <!-- Add Section Modal -->
 <div class="modal-overlay" id="add-section-modal">

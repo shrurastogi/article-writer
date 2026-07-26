@@ -2,41 +2,61 @@
 
 const router = require("express").Router();
 const { createCompletionForUser, MODEL } = require("../services/llmService");
-const { getSectionContext, getStyleInstruction } = require("../services/sectionContext");
+const { getSectionContext, getStyleInstruction, getSectionRequirements } = require("../services/sectionContext");
 const Article = require("../models/Article");
 const { requireApiAuth } = require("../middleware/auth");
 const logger = require("../utils/logger");
 
 // Generate draft content for a section
 router.post("/generate", async (req, res) => {
-  const { topic, sectionId, sectionTitle, notes, pubmedContext, userContext, language, writingStyle } = req.body;
+  const { topic, sectionId, sectionTitle, notes, pubmedContext, language, writingStyle, articleType, existingSections, prevSection, nextSection } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
   }
 
   const subject = topic.trim();
-  const context = getSectionContext(subject, sectionId, sectionTitle);
-  const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
-  const litText = pubmedContext?.trim()
-    ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
-    : "";
-  const userContextText = userContext?.trim()
-    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+  const context = getSectionContext(subject, sectionId, sectionTitle, articleType || "review");
+  const notesText = notes?.trim()
+    ? `\n\nKey points and data the author wants to cover (treat any statistics or trial data as authoritative):\n${notes}`
     : "";
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
   const styleText = getStyleInstruction(writingStyle);
+  const journalHint = { original_research: "NEJM, Lancet, JAMA", perspective: "NEJM Perspective, Lancet Comment, JAMA Viewpoint" }[articleType] || "Nat Rev / NEJM reviews, JCO Reviews";
+
+  // Adjacent sections drive transitions; remaining sections prevent repetition
+  const prevBlock = prevSection?.prose?.trim()
+    ? `\n\nPreceding section — "${prevSection.title}" (your section must open with a transition FROM this):\n...${prevSection.prose.trim().slice(-500)}`
+    : "";
+  const nextBlock = nextSection?.prose?.trim()
+    ? `\n\nFollowing section — "${nextSection.title}" (lead INTO this — do not cover its content):\n${nextSection.prose.trim().slice(0, 400)}...`
+    : "";
+  const otherSections = Array.isArray(existingSections) && existingSections.length
+    ? existingSections.filter(s => s.prose?.trim() && s.title !== prevSection?.title && s.title !== nextSection?.title)
+    : [];
+  const existingSectionsText = otherSections.length
+    ? `\n\nOther sections already written (do not repeat these topics):\n` +
+      otherSections.map(s => `- ${s.title}: ...${s.prose.trim().slice(-150)}`).join("\n")
+    : "";
+
+  const transitionRequirements = [
+    ...(prevSection ? [`Open with a sentence that flows naturally from the preceding "${prevSection.title}" section`] : []),
+    ...(nextSection ? [`Close with a forward-looking sentence that leads into the following "${nextSection.title}" section without pre-empting its content`] : []),
+  ];
+
+  const { requirements, suppressPubmed, suppressExistingSections, maxTokens } = getSectionRequirements(sectionId, journalHint, styleText);
+  const litText = !suppressPubmed && pubmedContext?.trim()
+    ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
+    : "";
+  const allRequirements = [...requirements, ...transitionRequirements];
+  const contextText = suppressExistingSections ? "" : (existingSectionsText + prevBlock + nextBlock);
 
   const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
-- Formal academic writing style suitable for a high-impact journal (e.g. NEJM, Lancet, JCO)
-- Evidence-based with citations as [Author et al., Year] placeholders
-- Comprehensive yet concise (300–600 words for most sections)
-- Include key statistics, landmark trial names, drug names, and current guidelines where applicable
-- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
+${allRequirements.map(r => `- ${r}`).join("\n")}${notesText}${litText}${contextText}`;
 
   try {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -44,7 +64,7 @@ Requirements:
 
     const stream = await createCompletionForUser({
       model: MODEL,
-      max_tokens: 1800,
+      max_tokens: maxTokens,
       messages: [{ role: "user", content: prompt }],
       stream: true,
     }, req.user);
@@ -62,7 +82,7 @@ Requirements:
 
 // Improve existing section text
 router.post("/improve", async (req, res) => {
-  const { topic, sectionTitle, content, pubmedContext, userContext, language, writingStyle } = req.body;
+  const { topic, sectionId, sectionTitle, content, notes, pubmedContext, language, writingStyle, prevSection, nextSection } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -72,16 +92,35 @@ router.post("/improve", async (req, res) => {
   }
 
   const subject = topic.trim();
+  const { noCitations: noCitationsImprove } = getSectionRequirements(sectionId, "", "");
   const litText = pubmedContext?.trim()
-    ? `\n\nRecent literature from PubMed (use these for evidence and citations):\n${pubmedContext}`
+    ? `\n\nRecent literature from PubMed (use these for evidence and context):\n${pubmedContext}`
     : "";
-  const userContextText = userContext?.trim()
-    ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
+  const noCitationsNote = noCitationsImprove
+    ? "\n\nIMPORTANT: Do NOT add any citation markers, author names, or reference tags (e.g. [Author et al., Year], [1], (Smith 2021)) — this is an abstract and must not cite papers."
+    : "";
+  const notesText = notes?.trim()
+    ? `\n\nKey points and data the author wants to ensure are covered (treat any statistics or trial data as authoritative):\n${notes}`
     : "";
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
   const styleText = getStyleInstruction(writingStyle);
+
+  const prevBlock = prevSection?.prose?.trim()
+    ? `\n\nPreceding section — "${prevSection.title}" (final part):\n...${prevSection.prose.trim().slice(-400)}`
+    : "";
+  const nextBlock = nextSection?.prose?.trim()
+    ? `\n\nFollowing section — "${nextSection.title}" (opening part):\n${nextSection.prose.trim().slice(0, 300)}...`
+    : "";
+  const transitionBullets = [
+    ...(prevSection ? [`Ensure the section opens with a smooth transition from the preceding "${prevSection.title}" section`] : []),
+    ...(nextSection ? [`Ensure the section closes with a forward-looking lead-in to the following "${nextSection.title}" section`] : []),
+  ];
+
+  const citationBullet = noCitationsNote
+    ? ""
+    : "\n- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)";
 
   const prompt = `${languagePrefix}You are an expert medical writer specializing in ${subject}. Improve the following text from the "${sectionTitle}" section of a review article on ${subject}.
 
@@ -89,10 +128,9 @@ Make it:
 - More academically rigorous and precise in language
 - Better structured with clear logical flow and transitions
 - Consistent with standard ${subject} terminology and nomenclature
-- More concise where appropriate without losing key content
-- Better cited (add [Author et al., Year] placeholders where evidence is cited without a reference)${styleText ? `\n- ${styleText}` : ""}
+- More concise where appropriate without losing key content${citationBullet}${styleText ? `\n- ${styleText}` : ""}${transitionBullets.map(b => `\n- ${b}`).join("")}
 
-Return ONLY the improved text — no explanations, no heading.${litText}${userContextText}
+Return ONLY the improved text — no explanations, no heading.${litText}${notesText}${prevBlock}${nextBlock}${noCitationsNote}
 
 Original text:
 ${content}`;
@@ -236,7 +274,7 @@ Example structure:
 
 // Refine an existing draft section with a user instruction
 router.post("/refine", async (req, res) => {
-  const { topic, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language, writingStyle } = req.body;
+  const { topic, sectionId, sectionTitle, currentDraft, instruction, pubmedContext, userContext, language, writingStyle } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -248,6 +286,10 @@ router.post("/refine", async (req, res) => {
     return res.status(400).json({ error: "No refinement instruction provided." });
   }
 
+  const { noCitations } = getSectionRequirements(sectionId, "", "");
+  const noCitationsNote = noCitations
+    ? "\n\nIMPORTANT: Do NOT add any citation markers, author names, or reference tags (e.g. [Author et al., Year], [1], (Smith 2021)) — this is an abstract and must not cite papers."
+    : "";
   const litText = pubmedContext?.trim()
     ? `\n\n${pubmedContext}`
     : "";
@@ -265,7 +307,7 @@ The user has a draft of the "${sectionTitle}" section and wants to refine it wit
 Instruction: ${instruction}${styleText ? `\n${styleText}` : ""}
 
 Current draft:
-${currentDraft}${litText}${userContextText}
+${currentDraft}${litText}${userContextText}${noCitationsNote}
 
 Apply the instruction precisely. Preserve content not targeted by the instruction.
 Return ONLY the refined section text — no heading, no preamble, no explanation.`;
@@ -322,13 +364,19 @@ Evaluate the article and return your analysis in exactly this structure:
 One sentence verdict: does the paper flow as a coherent whole? (e.g. "Strong overall flow with minor disconnect in sections 3–4.")
 
 ## Section-by-Section Flow
-For each adjacent section pair, one line: ✅ if the transition is smooth, ⚠️ if there is a minor issue, ❌ if there is a clear disconnect. Include a brief reason for ⚠️ and ❌.
+For each adjacent section pair, one line in this format:
+[Status icon] SectionA → SectionB: [reason if ⚠️ or ❌]
+Status icons: ✅ smooth transition | ⚠️ minor issue | ❌ clear disconnect
+For ⚠️ and ❌: quote the specific closing sentence of the first section and/or opening sentence of the second section that creates the problem.
 
 ## Key Issues Found
-Numbered list of specific problems: terminology inconsistencies, repeated content, missing links between sections, claims in one section contradicted elsewhere, or conclusions not supported by the body. Be specific (name the sections).
+Numbered list of specific problems: abrupt topic jumps, repeated content, undefined terms used before introduction, claims in one section contradicted elsewhere, conclusions not grounded in the body. Name the exact section and quote the offending sentence where relevant.
 
 ## Recommendations
-Numbered list of concrete, actionable edits to fix the issues above. Each recommendation must name the target section(s).
+Numbered list of concrete edits, one per issue. Each must:
+- Name the target section
+- State exactly what to change (e.g. "Add a bridging sentence at the end of [Section A] that introduces [the concept opened in Section B]")
+- Suggest the specific transition language to add or remove
 
 Be direct and specific. Do not pad with generic praise.`;
 
@@ -338,7 +386,7 @@ Be direct and specific. Do not pad with generic praise.`;
 
     const stream = await createCompletionForUser({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
       stream: true,
     }, req.user);
@@ -374,10 +422,10 @@ router.post("/coherence-fix", async (req, res) => {
   const styleText = getStyleInstruction(writingStyle);
 
   const prevBlock = prevSection?.prose?.trim()
-    ? `\n\nPreceding section — "${prevSection.title}" (final part):\n${prevSection.prose.trim().slice(-400)}`
+    ? `\n\nPreceding section — "${prevSection.title}" (final part):\n${prevSection.prose.trim().slice(-600)}`
     : "";
   const nextBlock = nextSection?.prose?.trim()
-    ? `\n\nFollowing section — "${nextSection.title}" (opening part):\n${nextSection.prose.trim().slice(0, 400)}`
+    ? `\n\nFollowing section — "${nextSection.title}" (opening part):\n${nextSection.prose.trim().slice(0, 600)}`
     : "";
 
   const prompt = `${languagePrefix}You are a senior medical editor fixing a coherence issue in a review article on "${topic.trim()}".
@@ -459,6 +507,54 @@ Rules:
     const stream = await createCompletionForUser({
       model: MODEL,
       max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    }, req.user);
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) res.write(text);
+    }
+    res.end();
+  } catch (err) {
+    logger.error({ msg: "LLM API error", error: err.message });
+    res.status(err.status || 500).json({ error: "AI generation failed: " + err.message });
+  }
+});
+
+// Apply grammar/style fixes suggested by the grammar checker
+router.post("/grammar-fix", async (req, res) => {
+  const { content, issues, topic, sectionTitle, language } = req.body;
+
+  if (!content?.trim()) return res.status(400).json({ error: "Section content is required." });
+  if (!issues?.trim()) return res.status(400).json({ error: "No issues provided." });
+
+  const languagePrefix = language && language !== "English"
+    ? `Important: Respond in ${language} at a clinical academic level.\n\n`
+    : "";
+
+  const prompt = `${languagePrefix}You are a scientific copy-editor. Revise the section text below by applying the listed grammar and style fixes. Make only the targeted corrections — do not rewrite, expand, or change any content beyond what is needed to resolve each issue.
+
+Section: "${sectionTitle || "Untitled"}"
+Topic: "${topic?.trim() || "medical"}"
+
+Issues to fix:
+${issues.trim()}
+
+Original text:
+"""
+${content.trim()}
+"""
+
+Return ONLY the corrected text — no preamble, no commentary, no heading.`;
+
+  try {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    const stream = await createCompletionForUser({
+      model: MODEL,
+      max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
       stream: true,
     }, req.user);
@@ -559,7 +655,7 @@ Return ONLY a JSON array of strings — no explanation, no markdown, no numberin
 
 // One-click full article draft — SSE endpoint
 router.post("/agent/draft", async (req, res) => {
-  const { topic, sections, language, pubmedContext, writingStyle } = req.body;
+  const { topic, sections, language, pubmedContext, writingStyle, articleType } = req.body;
 
   if (!topic?.trim()) {
     return res.status(400).json({ error: "A medical topic is required." });
@@ -580,34 +676,39 @@ router.post("/agent/draft", async (req, res) => {
   const languagePrefix = language && language !== "English"
     ? `Important: Respond in ${language} at a clinical academic level.\n\n`
     : "";
-  const litText = pubmedContext?.trim()
-    ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
-    : "";
-
   const styleText = getStyleInstruction(writingStyle);
+  const generatedSections = [];
+  const journalHint = { original_research: "NEJM, Lancet, JAMA", perspective: "NEJM Perspective, Lancet Comment" }[articleType] || "Nat Rev / NEJM reviews, JCO Reviews";
 
   try {
     for (const section of sections) {
       const { id, title, notes, userContext } = section;
       sendEvent({ type: "section_start", id, title });
 
-      const context = getSectionContext(subject, id, title);
+      const context = getSectionContext(subject, id, title, articleType || "review");
       const notesText = notes?.trim() ? `\n\nAuthor's specific focus areas:\n${notes}` : "";
       const userContextText = userContext?.trim()
         ? `\n\nAuthor-supplied data (treat as authoritative — incorporate directly):\n${userContext.trim()}`
         : "";
+      const priorContextText = generatedSections.length
+        ? `\n\nPreviously generated sections (do not repeat these points — build upon them):\n` +
+          generatedSections.map(s => `- ${s.title}: ${s.prose.slice(0, 150)}…`).join("\n")
+        : "";
+
+      const { requirements, suppressPubmed, suppressExistingSections, maxTokens } = getSectionRequirements(id, journalHint, styleText);
+      const litText = !suppressPubmed && pubmedContext?.trim()
+        ? `\n\nRecent literature from PubMed (use these abstracts for evidence and [Author et al., Year] citations):\n${pubmedContext}`
+        : "";
+      const priorText = suppressExistingSections ? "" : priorContextText;
 
       const prompt = `${languagePrefix}You are an expert medical writer with deep expertise in ${subject}. Write ${context}.
 
 Requirements:
-- Formal academic writing style suitable for a high-impact journal
-- Evidence-based with citations as [Author et al., Year] placeholders
-- Comprehensive yet concise (300–600 words for most sections)
-- Return ONLY the section content — no section heading, no preamble, no explanations${styleText ? `\n- ${styleText}` : ""}${notesText}${litText}${userContextText}`;
+${requirements.map(r => `- ${r}`).join("\n")}${notesText}${litText}${userContextText}${priorText}`;
 
       const stream = await createCompletionForUser({
         model: MODEL,
-        max_tokens: 1800,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
         stream: true,
       }, req.user);
@@ -618,6 +719,7 @@ Requirements:
       }
 
       sendEvent({ type: "section_done", id, title, content });
+      generatedSections.push({ title, prose: content });
     }
 
     sendEvent({ type: "complete" });
