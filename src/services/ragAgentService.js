@@ -158,7 +158,7 @@ async function* runAgentWorkflow(question, articleId, sectionId, user, article) 
   yield { type: "thinking", text: `Intent: ${intent}. Searching library...` };
 
   // Step 1: retrieve relevant chunks
-  let chunks = await searchLibrary(question, articleId, library, user, 10);
+  const chunks = await searchLibrary(question, articleId, library, user, 10);
 
   if (!chunks.length) {
     yield { type: "token", text: "No relevant papers found in your library for this question." };
