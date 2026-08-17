@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Coding standards: naming conventions, error handling, logging, security
 - Testing requirements and CI gates
 - Brand guidelines (GSK colors)
+- Do not start writing code until you are 95% confident what you need to do. Ask me followup questions until you reach the confidence level of 95%.
 
 ## Specialist Commands
 

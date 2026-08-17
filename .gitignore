@@ -7,3 +7,5 @@ tmp/
 .claude/*
 !.claude/commands/
 !.claude/commands/**
+*.pdf
+*.docx

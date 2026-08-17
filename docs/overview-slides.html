@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical Article Writer — Overview</title>
+<style>
+:root {
+  --navy: #1A1F71;
+  --navy2: #2a3080;
+  --orange: #F36633;
+  --green: #2d9e6b;
+  --white: #ffffff;
+  --g100: #f8f9fa;
+  --g200: #e9ecef;
+  --g600: #6c757d;
+  --g900: #212529;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#08090f;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  min-height:100vh;padding:16px;overflow:hidden;
+}
+.wrapper{position:relative;width:100%;max-width:1200px;aspect-ratio:16/9}
+.deck{width:100%;height:100%;position:relative;overflow:hidden;border-radius:12px;box-shadow:0 20px 70px rgba(0,0,0,.55)}
+.slide{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:flex;flex-direction:column;padding:5% 6%;
+  opacity:0;transform:translateX(56px);
+  transition:opacity .38s ease,transform .38s ease;
+  pointer-events:none;
+}
+.slide.active{opacity:1;transform:translateX(0);pointer-events:all}
+.slide.out{opacity:0;transform:translateX(-56px)}
+
+/* themes */
+.t-navy{background:var(--navy);color:#fff}
+.t-white{background:#fff;color:var(--g900)}
+.t-grad{background:linear-gradient(135deg,var(--navy) 0%,#2d3494 100%);color:#fff}
+.t-dark{background:#0d0f1a;color:#fff}
+
+/* typography */
+.label{font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:.6em}
+.h1{font-size:clamp(1.6rem,3.5vw,2.6rem);font-weight:700;line-height:1.15;margin-bottom:.7em}
+.h1-white{color:#fff}
+.accent-bar{width:52px;height:4px;background:var(--orange);border-radius:2px;margin-bottom:1.2em}
+
+/* grid helpers */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:4%}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:3%}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:2.5%}
+.g-6040{display:grid;grid-template-columns:3fr 2fr;gap:4%}
+
+/* cards */
+.card{background:var(--g100);border-radius:10px;padding:5% 6%;border-left:4px solid var(--orange)}
+.card-d{background:rgba(255,255,255,.09);border-radius:10px;padding:5% 6%;border-left:4px solid var(--orange)}
+.ci{font-size:1.6rem;margin-bottom:.5em}
+.ct{font-size:.88rem;font-weight:700;margin-bottom:.35em;color:var(--navy)}
+.cd{font-size:.78rem;line-height:1.55;color:var(--g600)}
+.card-d .ct{color:#fff}
+.card-d .cd{color:rgba(255,255,255,.65)}
+
+/* lists */
+.dots{list-style:none;display:flex;flex-direction:column;gap:.75em}
+.dots li{display:flex;align-items:flex-start;gap:.6em;font-size:.85rem;line-height:1.5}
+.dots li::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--orange);margin-top:.4em;flex-shrink:0}
+
+/* steps */
+.steps{display:flex;flex-direction:column;gap:.9em;flex:1}
+.step{display:flex;align-items:flex-start;gap:.75em}
+.snum{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;font-weight:700;flex-shrink:0}
+.t-dark .snum{background:var(--orange)}
+.stitle{font-size:.88rem;font-weight:600;margin-bottom:.15em}
+.sdesc{font-size:.76rem;opacity:.62;line-height:1.35}
+
+/* roadmap */
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:.85em;flex:1}
+.ri{background:rgba(255,255,255,.07);border-radius:9px;padding:.9em 1em;display:flex;gap:.7em;align-items:flex-start}
+.ri-icon{font-size:1.3rem;flex-shrink:0}
+.ri strong{display:block;font-size:.82rem;font-weight:700;margin-bottom:.2em}
+.ri span{font-size:.74rem;opacity:.62;line-height:1.35}
+
+/* badge */
+.badge{display:inline-block;padding:3px 11px;border-radius:20px;font-size:.7rem;font-weight:700}
+.bo{background:var(--orange);color:#fff}
+.bn{background:var(--navy);color:#fff}
+.bg{background:var(--green);color:#fff}
+
+/* nav */
+.nav{display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:1200px;margin-top:12px;padding:0 2px}
+.nb{background:rgba(255,255,255,.1);color:#fff;border:none;
+  padding:8px 22px;border-radius:7px;cursor:pointer;
+  font-size:.83rem;transition:background .2s}
+.nb:hover{background:rgba(255,255,255,.18)}
+.nb:disabled{opacity:.3;cursor:default}
+.sc{color:rgba(255,255,255,.55);font-size:.8rem}
+.pbar{width:100%;max-width:1200px;height:3px;background:rgba(255,255,255,.12);border-radius:2px;margin-top:8px}
+.pfill{height:100%;background:var(--orange);border-radius:2px;transition:width .38s ease}
+
+/* section tag pills */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1em}
+.tag{background:var(--g200);border-radius:5px;padding:2px 9px;font-size:.7rem;color:#444}
+.tag-o{background:var(--orange);color:#fff}
+
+/* info strip */
+.strip{border-radius:10px;padding:1em 1.2em;font-size:.83rem;line-height:1.55}
+.strip-navy{background:var(--navy);color:rgba(255,255,255,.85)}
+.strip-pale{background:var(--g100);color:var(--g900);border:1px dashed rgba(26,31,113,.3)}
+
+/* title slide */
+.title-pill{display:inline-flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  border-radius:20px;padding:5px 14px;font-size:.75rem;color:rgba(255,255,255,.8);
+  margin-bottom:1.4em;width:fit-content}
+.tpdot{width:7px;height:7px;border-radius:50%;background:var(--orange)}
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+<div class="deck" id="deck">
+
+<!-- ── SLIDE 1: TITLE ── -->
+<div class="slide t-navy active" id="s1">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="title-pill"><div class="tpdot"></div>AI-Powered Medical Writing</div>
+    <div class="label">Medical Article Writer</div>
+    <div class="h1 h1-white" style="font-size:clamp(2rem,4.5vw,3.4rem);max-width:640px">
+      Smarter, Faster<br>Medical Review Articles
+    </div>
+    <div style="font-size:clamp(.9rem,1.5vw,1.15rem);opacity:.72;max-width:520px;line-height:1.65;font-weight:300;margin-bottom:1.8em">
+      An AI writing assistant for clinicians and researchers — grounded in real PubMed literature, structured for peer-reviewed journals.
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="badge bo">Sprint 8 · Live</span>
+      <span style="font-size:.75rem;opacity:.45">Medical Article Writer v2.0</span>
+    </div>
+  </div>
+  <div style="position:absolute;right:7%;top:50%;transform:translateY(-50%);opacity:.05;font-size:12rem;font-weight:800;pointer-events:none">✍</div>
+</div>
+
+<!-- ── SLIDE 2: PROBLEM ── -->
+<div class="slide t-white" id="s2">
+  <div class="accent-bar"></div>
+  <div class="label">The Challenge</div>
+  <div class="h1">Writing review articles is hard — and slow</div>
+  <div class="g2" style="flex:1;align-items:center">
+    <ul class="dots">
+      <li>Maintaining narrative flow across 10+ distinct sections takes days</li>
+      <li>Every claim must be backed by citable PubMed evidence</li>
+      <li>Word and Google Docs offer zero structural guidance</li>
+      <li>General AI tools (ChatGPT) make up citations and ignore article structure</li>
+      <li>Formatting exports to journal standards is manual and tedious</li>
+    </ul>
+    <div style="background:var(--navy);border-radius:14px;padding:7% 8%;color:#fff">
+      <div style="font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;color:var(--orange)">2+ hrs</div>
+      <div style="font-size:.8rem;opacity:.75;margin-bottom:1.2em">to write a single section first draft</div>
+      <div style="font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;color:var(--orange)">13 sections</div>
+      <div style="font-size:.8rem;opacity:.75;margin-bottom:1.2em">each with distinct journal requirements</div>
+      <div style="font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;color:var(--orange)">100%</div>
+      <div style="font-size:.8rem;opacity:.75">of AI output must be evidence-grounded</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 3: SOLUTION ── -->
+<div class="slide t-grad" id="s3">
+  <div class="label" style="color:rgba(255,165,50,.9)">The Solution</div>
+  <div class="h1 h1-white">Medical Article Writer</div>
+  <div class="g4" style="flex:1;align-items:start">
+    <div class="card-d"><div class="ci">📝</div><div class="ct">Structured Editor</div><div class="cd">13 pre-built sections matching peer-reviewed review article format — collapse what you're not working on</div></div>
+    <div class="card-d"><div class="ci">🤖</div><div class="ct">AI Writing</div><div class="cd">Generate, improve, and refine each section — grounded in your chosen PubMed papers, not general knowledge</div></div>
+    <div class="card-d"><div class="ci">🔬</div><div class="ct">PubMed-Grounded</div><div class="cd">Search PubMed, import by PMID, and ask natural-language questions of your reference library</div></div>
+    <div class="card-d"><div class="ci">📄</div><div class="ct">Journal-Ready Export</div><div class="cd">Download as Word (.docx) or PDF — formatted, page-broken, and named automatically</div></div>
+  </div>
+  <div style="margin-top:3%;padding:1em 1.2em;background:rgba(255,255,255,.08);border-radius:9px;font-size:.82rem;opacity:.85;line-height:1.5">
+    Every article is saved to your account and accessible from any device. Sign in with Google or email and password.
+  </div>
+</div>
+
+<!-- ── SLIDE 4: WHO USES IT ── -->
+<div class="slide t-white" id="s4">
+  <div class="accent-bar"></div>
+  <div class="label">Target Users</div>
+  <div class="h1">Built for three types of medical writers</div>
+  <div class="g3" style="flex:1;align-items:start">
+    <div class="card"><div class="ci">👨‍⚕️</div><div class="ct">Clinical Researcher / Academic Physician</div><div class="cd">Writing systematic or narrative reviews for peer-reviewed journals. Deep domain expertise, limited time. Uses AI to accelerate drafting without replacing clinical judgement.</div></div>
+    <div class="card"><div class="ci">✍️</div><div class="ct">Medical Writer</div><div class="cd">Professional writer for pharma companies, academic institutions, or clinical trial teams. Needs reliable citation grounding and journal-quality output — fast.</div></div>
+    <div class="card"><div class="ci">🎓</div><div class="ct">Resident / Fellow</div><div class="cd">Writing a first review article as part of training. Needs structural scaffolding, coverage checklists, and a confidence check on what to include in each section.</div></div>
+  </div>
+</div>
+
+<!-- ── SLIDE 5: APP JOURNEY ── -->
+<div class="slide t-white" id="s5">
+  <div class="accent-bar"></div>
+  <div class="label">How It Works</div>
+  <div class="h1" style="margin-bottom:.4em">Your journey from sign-in to finished article</div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <svg viewBox="0 0 860 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:220px">
+      <defs>
+        <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0L8,4L0,8L2,4Z" fill="#1A1F71"/>
+        </marker>
+      </defs>
+      <!-- boxes -->
+      <rect x="10"  y="90" width="130" height="65" rx="10" fill="#1A1F71"/>
+      <rect x="185" y="90" width="130" height="65" rx="10" fill="#1A1F71"/>
+      <rect x="360" y="78" width="160" height="90" rx="10" fill="#F36633"/>
+      <rect x="565" y="90" width="130" height="65" rx="10" fill="#1A1F71"/>
+      <rect x="740" y="90" width="110" height="65" rx="10" fill="#2d9e6b"/>
+      <!-- arrows -->
+      <line x1="140" y1="122" x2="183" y2="122" stroke="#1A1F71" stroke-width="2" marker-end="url(#a1)"/>
+      <line x1="315" y1="122" x2="358" y2="122" stroke="#1A1F71" stroke-width="2" marker-end="url(#a1)"/>
+      <line x1="520" y1="122" x2="563" y2="122" stroke="#1A1F71" stroke-width="2" marker-end="url(#a1)"/>
+      <line x1="695" y1="122" x2="738" y2="122" stroke="#1A1F71" stroke-width="2" marker-end="url(#a1)"/>
+      <!-- labels inside -->
+      <text x="75"  y="118" text-anchor="middle" fill="#fff" font-size="18" font-family="sans-serif">🔐</text>
+      <text x="75"  y="136" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="sans-serif">Sign In</text>
+      <text x="75"  y="149" text-anchor="middle" fill="rgba(255,255,255,.6)" font-size="9" font-family="sans-serif">Google or email</text>
+      <text x="250" y="118" text-anchor="middle" fill="#fff" font-size="18" font-family="sans-serif">📋</text>
+      <text x="250" y="136" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="sans-serif">Dashboard</text>
+      <text x="250" y="149" text-anchor="middle" fill="rgba(255,255,255,.6)" font-size="9" font-family="sans-serif">all your articles</text>
+      <text x="440" y="112" text-anchor="middle" fill="#fff" font-size="12" font-weight="700" font-family="sans-serif">✍️  Article Editor</text>
+      <text x="440" y="130" text-anchor="middle" fill="rgba(255,255,255,.88)" font-size="9.5" font-family="sans-serif">Write · AI-assist · References</text>
+      <text x="440" y="146" text-anchor="middle" fill="rgba(255,255,255,.88)" font-size="9.5" font-family="sans-serif">Quality checks · Auto-saved</text>
+      <text x="630" y="118" text-anchor="middle" fill="#fff" font-size="18" font-family="sans-serif">👁</text>
+      <text x="630" y="136" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="sans-serif">Live Preview</text>
+      <text x="630" y="149" text-anchor="middle" fill="rgba(255,255,255,.6)" font-size="9" font-family="sans-serif">right column, always on</text>
+      <text x="795" y="118" text-anchor="middle" fill="#fff" font-size="18" font-family="sans-serif">⬇</text>
+      <text x="795" y="136" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="sans-serif">Export</text>
+      <text x="795" y="149" text-anchor="middle" fill="rgba(255,255,255,.6)" font-size="9" font-family="sans-serif">PDF or Word</text>
+      <!-- autosave note -->
+      <rect x="260" y="210" width="340" height="30" rx="7" fill="#f0f1f8" stroke="#1A1F71" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="430" y="230" text-anchor="middle" fill="#1A1F71" font-size="9.5" font-family="sans-serif" font-style="italic">↺  Auto-saves every 1.5 s — work is never lost</text>
+    </svg>
+  </div>
+</div>
+
+<!-- ── SLIDE 6: EDITOR ── -->
+<div class="slide t-white" id="s6">
+  <div class="accent-bar"></div>
+  <div class="label">Article Editor</div>
+  <div class="h1" style="margin-bottom:.5em">Everything in one structured workspace</div>
+  <div class="g2" style="flex:1;align-items:start">
+    <div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5em">13 BUILT-IN SECTIONS</div>
+      <div class="tags" style="margin-bottom:1.2em">
+        <span class="tag">Abstract</span><span class="tag">Introduction</span>
+        <span class="tag">Epidemiology</span><span class="tag">Pathophysiology</span>
+        <span class="tag">Diagnosis</span><span class="tag">Staging</span>
+        <span class="tag">Treatment (newly diagnosed)</span>
+        <span class="tag">Treatment (relapsed)</span>
+        <span class="tag">Novel Therapies</span>
+        <span class="tag">Supportive Care</span>
+        <span class="tag">Future Directions</span>
+        <span class="tag">Conclusion</span>
+        <span class="tag">References</span>
+        <span class="tag tag-o">+ custom sections</span>
+      </div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:.5em">AI ACTIONS PER SECTION</div>
+      <ul class="dots">
+        <li><strong>Generate Draft</strong> — write a full section from scratch, streaming in real-time</li>
+        <li><strong>Improve</strong> — rewrite existing text for academic rigor and flow</li>
+        <li><strong>Key Points</strong> — get a checklist of landmark topics to cover</li>
+        <li><strong>Expand to Prose</strong> — convert bullet notes to flowing academic text</li>
+        <li><strong>Refine</strong> — give an instruction ("make more concise", "add MAIA data")</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.85em">
+      <div class="card"><div class="ct">👁 Live Preview Pane</div><div class="cd">Right column updates as you type — exactly as the exported article will look.</div></div>
+      <div class="card"><div class="ct">📊 Per-Section Word Count</div><div class="cd">Each section shows a live word count. A running total is always visible in the header.</div></div>
+      <div class="card"><div class="ct">🗂 AI Tables</div><div class="cd">Describe a table in plain English — AI generates it as a formatted HTML table. Renders inline and exports to Word and PDF.</div></div>
+      <div class="card"><div class="ct">💡 Hints Field</div><div class="cd">Optional per-section notes guide the AI — e.g. "focus on CAR-T post 2022, include updated NCCN guidelines".</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 7: AI WRITING FLOW ── -->
+<div class="slide t-white" id="s7">
+  <div class="accent-bar"></div>
+  <div class="label">AI Writing Assistance</div>
+  <div class="h1" style="margin-bottom:.4em">From blank section to polished prose in minutes</div>
+  <div style="flex:1;display:flex;align-items:center">
+    <svg viewBox="0 0 900 230" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+      <defs>
+        <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0L8,4L0,8L2,4Z" fill="#1A1F71"/>
+        </marker>
+        <marker id="a3" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+          <path d="M0,0L7,3.5L0,7L1.5,3.5Z" fill="#F36633"/>
+        </marker>
+      </defs>
+      <!-- Step 1 -->
+      <rect x="5"   y="70" width="120" height="70" rx="9" fill="#e8eaf6"/>
+      <text x="65"  y="96"  text-anchor="middle" font-size="17" font-family="sans-serif">📂</text>
+      <text x="65"  y="113" text-anchor="middle" font-size="10" font-weight="700" fill="#1A1F71" font-family="sans-serif">Open Section</text>
+      <text x="65"  y="127" text-anchor="middle" font-size="8.5" fill="#666" font-family="sans-serif">e.g. Treatment</text>
+      <line x1="125" y1="105" x2="148" y2="105" stroke="#1A1F71" stroke-width="1.5" marker-end="url(#a2)"/>
+      <!-- Step 2 optional -->
+      <rect x="150" y="70" width="120" height="70" rx="9" fill="#fff3ec" stroke="#F36633" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="210" y="88"  text-anchor="middle" font-size="7.5" fill="#F36633" font-weight="700" font-family="sans-serif">OPTIONAL</text>
+      <text x="210" y="104" text-anchor="middle" font-size="10" font-weight="700" fill="#F36633" font-family="sans-serif">Add Notes</text>
+      <text x="210" y="118" text-anchor="middle" font-size="8" fill="#888" font-family="sans-serif">"focus on MAIA trial"</text>
+      <text x="210" y="130" text-anchor="middle" font-size="8" fill="#888" font-family="sans-serif">"post-2022 data only"</text>
+      <line x1="270" y1="105" x2="293" y2="105" stroke="#1A1F71" stroke-width="1.5" marker-end="url(#a2)"/>
+      <!-- Step 3 optional -->
+      <rect x="295" y="70" width="120" height="70" rx="9" fill="#fff3ec" stroke="#F36633" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="355" y="88"  text-anchor="middle" font-size="7.5" fill="#F36633" font-weight="700" font-family="sans-serif">OPTIONAL</text>
+      <text x="355" y="104" text-anchor="middle" font-size="10" font-weight="700" fill="#F36633" font-family="sans-serif">Select Papers</text>
+      <text x="355" y="118" text-anchor="middle" font-size="8" fill="#888" font-family="sans-serif">tick papers in your</text>
+      <text x="355" y="130" text-anchor="middle" font-size="8" fill="#888" font-family="sans-serif">reference library</text>
+      <line x1="415" y1="105" x2="438" y2="105" stroke="#1A1F71" stroke-width="1.5" marker-end="url(#a2)"/>
+      <!-- Step 4 -->
+      <rect x="440" y="60" width="128" height="88" rx="9" fill="#1A1F71"/>
+      <text x="504" y="88"  text-anchor="middle" font-size="12" font-family="sans-serif" fill="#fff">✨</text>
+      <text x="504" y="105" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff" font-family="sans-serif">Generate Draft</text>
+      <text x="504" y="119" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.7)" font-family="sans-serif">AI streams draft</text>
+      <text x="504" y="131" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.7)" font-family="sans-serif">in real-time</text>
+      <line x1="568" y1="104" x2="591" y2="104" stroke="#1A1F71" stroke-width="1.5" marker-end="url(#a2)"/>
+      <!-- Step 5 -->
+      <rect x="593" y="70" width="120" height="70" rx="9" fill="#e8eaf6"/>
+      <text x="653" y="96"  text-anchor="middle" font-size="17" font-family="sans-serif">👁</text>
+      <text x="653" y="113" text-anchor="middle" font-size="10" font-weight="700" fill="#1A1F71" font-family="sans-serif">Review &amp; Edit</text>
+      <text x="653" y="127" text-anchor="middle" font-size="8.5" fill="#666" font-family="sans-serif">edit directly in box</text>
+      <!-- Refine loop -->
+      <path d="M713 105 Q755 75 755 107 Q755 138 713 136" fill="none" stroke="#F36633" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#a3)"/>
+      <text x="772" y="105" text-anchor="middle" font-size="8" fill="#F36633" font-family="sans-serif" font-style="italic">↺ Refine</text>
+      <line x1="713" y1="104" x2="736" y2="104" stroke="#1A1F71" stroke-width="1.5" marker-end="url(#a2)"/>
+      <!-- Step 6 -->
+      <rect x="795" y="70" width="100" height="70" rx="9" fill="#2d9e6b"/>
+      <text x="845" y="96"  text-anchor="middle" font-size="17" font-family="sans-serif" fill="#fff">✅</text>
+      <text x="845" y="113" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">Apply</text>
+      <text x="845" y="127" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.75)" font-family="sans-serif">auto-saved</text>
+      <!-- bottom note -->
+      <rect x="175" y="188" width="550" height="28" rx="7" fill="#f0f1f8"/>
+      <text x="450" y="207" text-anchor="middle" fill="#1A1F71" font-size="9.5" font-family="sans-serif">AI only uses the papers YOU selected — your evidence base stays in control of what gets written</text>
+    </svg>
+  </div>
+</div>
+
+<!-- ── SLIDE 8: REFERENCE LIBRARY ── -->
+<div class="slide t-white" id="s8">
+  <div class="accent-bar"></div>
+  <div class="label">Reference Library</div>
+  <div class="h1" style="margin-bottom:.6em">Three ways to find and use research papers</div>
+  <div class="g3" style="margin-bottom:3%">
+    <div class="card"><div class="ci">📎</div><div class="ct">Import by PMID</div><div class="cd">Paste paper IDs — the app fetches title, authors, journal, abstract, and full text (for open-access papers) from PubMed automatically.</div></div>
+    <div class="card"><div class="ci">🔍</div><div class="ct">PubMed Search</div><div class="cd">Type a keyword to search PubMed from within the app. Up to 10 results with abstracts. One click adds any result to your library.</div></div>
+    <div class="card"><div class="ci">💬</div><div class="ct">Ask Your Library</div><div class="cd">Ask a natural-language question — "What does MAIA show about OS?" — and AI searches your imported papers and streams back a cited answer.</div></div>
+  </div>
+  <div class="strip strip-navy" style="display:flex;gap:5%;align-items:center">
+    <div style="flex:1">
+      <strong style="color:var(--orange)">How AI uses your library:</strong> Each paper has a <em>Use in AI</em> toggle. Only toggled-on papers are passed as context — the model writes from <em>your</em> evidence base, not from general training knowledge. Toggle individual papers on/off, or use Select All / Deselect All.
+    </div>
+    <div style="display:flex;gap:10px;flex-shrink:0">
+      <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:.6em .9em;text-align:center">
+        <div style="font-size:1.3rem">✓</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.65);margin-top:3px">Use in AI<br><strong style="color:#fff">ON</strong></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border-radius:8px;padding:.6em .9em;text-align:center;opacity:.55">
+        <div style="font-size:1.3rem">○</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.65);margin-top:3px">Use in AI<br><strong style="color:#fff">OFF</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 9: ASK LIBRARY FLOW ── -->
+<div class="slide t-navy" id="s9">
+  <div class="label" style="color:rgba(255,165,50,.9)">Ask Your Library</div>
+  <div class="h1 h1-white" style="margin-bottom:.5em">Ask questions of your own reference collection</div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <svg viewBox="0 0 860 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:190px">
+      <defs>
+        <marker id="a4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0L8,4L0,8L2,4Z" fill="rgba(255,255,255,.6)"/>
+        </marker>
+      </defs>
+      <rect x="5"   y="65" width="145" height="70" rx="10" fill="rgba(255,255,255,.11)"/>
+      <text x="77"  y="91"  text-anchor="middle" font-size="17" font-family="sans-serif">❓</text>
+      <text x="77"  y="108" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">Ask a Question</text>
+      <text x="77"  y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.55)" font-family="sans-serif">"What does MAIA show?"</text>
+      <line x1="150" y1="100" x2="173" y2="100" stroke="rgba(255,255,255,.45)" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="175" y="65" width="145" height="70" rx="10" fill="rgba(255,255,255,.11)"/>
+      <text x="247"  y="91"  text-anchor="middle" font-size="17" font-family="sans-serif">🧠</text>
+      <text x="247"  y="108" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">Classify Intent</text>
+      <text x="247"  y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.55)" font-family="sans-serif">stats · comparison · general</text>
+      <line x1="320" y1="100" x2="343" y2="100" stroke="rgba(255,255,255,.45)" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="345" y="65" width="145" height="70" rx="10" fill="rgba(255,255,255,.11)"/>
+      <text x="417"  y="91"  text-anchor="middle" font-size="17" font-family="sans-serif">🔎</text>
+      <text x="417"  y="108" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">Search Your Papers</text>
+      <text x="417"  y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.55)" font-family="sans-serif">semantic match across library</text>
+      <line x1="490" y1="100" x2="513" y2="100" stroke="rgba(255,255,255,.45)" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="515" y="55" width="155" height="90" rx="10" fill="#F36633"/>
+      <text x="592"  y="83"  text-anchor="middle" font-size="12" font-family="sans-serif" fill="#fff">✨</text>
+      <text x="592"  y="100" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff" font-family="sans-serif">Generate Answer</text>
+      <text x="592"  y="115" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.82)" font-family="sans-serif">streams in real-time</text>
+      <text x="592"  y="128" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.82)" font-family="sans-serif">with inline citations</text>
+      <line x1="670" y1="100" x2="693" y2="100" stroke="rgba(255,255,255,.45)" stroke-width="1.5" marker-end="url(#a4)"/>
+      <rect x="695" y="65" width="160" height="70" rx="10" fill="rgba(255,255,255,.11)"/>
+      <text x="775"  y="91"  text-anchor="middle" font-size="17" font-family="sans-serif">📝</text>
+      <text x="775"  y="108" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="sans-serif">Insert into Article</text>
+      <text x="775"  y="122" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,.55)" font-family="sans-serif">one-click to any section</text>
+      <!-- note -->
+      <rect x="100" y="170" width="660" height="28" rx="7" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
+      <text x="430" y="189" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,.65)" font-family="sans-serif" font-style="italic">Answers are grounded only in papers YOU have imported — no hallucinated references</text>
+    </svg>
+  </div>
+</div>
+
+<!-- ── SLIDE 10: QUALITY CHECKS ── -->
+<div class="slide t-white" id="s10">
+  <div class="accent-bar"></div>
+  <div class="label">Quality Assurance</div>
+  <div class="h1" style="margin-bottom:.6em">AI-powered checks before you submit</div>
+  <div class="g2" style="flex:1;align-items:start">
+    <div style="background:var(--navy);border-radius:12px;padding:6% 7%;color:#fff;height:100%">
+      <div style="font-size:1rem;font-weight:700;margin-bottom:.6em">📊 Paper Flow Check</div>
+      <div style="font-size:.82rem;line-height:1.6;opacity:.85;margin-bottom:.8em">Analyses ALL sections together and checks whether the article reads as a coherent whole. Returns:</div>
+      <ul style="padding-left:14px;font-size:.8rem;opacity:.8;line-height:1.85">
+        <li>Overall one-sentence verdict</li>
+        <li>Section-by-section transition score (✅ / ⚠️ / ❌)</li>
+        <li>Specific issues named by section pair</li>
+        <li>Numbered, actionable recommendations</li>
+      </ul>
+      <div style="margin-top:.9em;background:rgba(243,102,51,.2);border-radius:7px;padding:.7em .9em;font-size:.78rem">
+        Each recommendation has a one-click <strong>Fix</strong> button — AI rewrites that section using surrounding sections as context.
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.85em;height:100%">
+      <div class="card" style="flex:1">
+        <div class="ct">✏️ Grammar &amp; Style Check</div>
+        <div class="cd">Checks each section for passive voice overuse, sentence length, academic register, and hedging. One-click applies suggested fixes — streams corrected text for your review before you accept.</div>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="ct">📚 Version History</div>
+        <div class="cd">Save named snapshots at any point ("after reviewer comments"). Restore any previous version — the current state is always saved first, so no work is ever lost.</div>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="ct">🔒 Lock &amp; Share</div>
+        <div class="cd">Lock an article to prevent accidental edits. Generate a read-only shareable link for co-authors to review without an account.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 11: EXPORT ── -->
+<div class="slide t-grad" id="s11">
+  <div class="label" style="color:rgba(255,165,50,.9)">Export</div>
+  <div class="h1 h1-white" style="margin-bottom:5%">Journal-ready output in two formats</div>
+  <div class="g2" style="flex:1;align-items:stretch">
+    <div style="background:rgba(255,255,255,.1);border-radius:14px;padding:6% 7%;display:flex;flex-direction:column;gap:1em">
+      <div style="font-size:2.5rem">📄</div>
+      <div style="font-size:1.2rem;font-weight:700;color:#fff">PDF Export</div>
+      <ul class="dots" style="--dot:#F36633">
+        <li style="color:rgba(255,255,255,.85)">A4 format with correct page breaks</li>
+        <li style="color:rgba(255,255,255,.85)">Article title in header, page numbers in footer</li>
+        <li style="color:rgba(255,255,255,.85)">Consistent font rendering</li>
+        <li style="color:rgba(255,255,255,.85)">Tables and citations exactly as in the editor</li>
+      </ul>
+    </div>
+    <div style="background:rgba(255,255,255,.1);border-radius:14px;padding:6% 7%;display:flex;flex-direction:column;gap:1em">
+      <div style="font-size:2.5rem">📝</div>
+      <div style="font-size:1.2rem;font-weight:700;color:#fff">Word Export (.docx)</div>
+      <ul class="dots">
+        <li style="color:rgba(255,255,255,.85)">Native Word document — fully editable after download</li>
+        <li style="color:rgba(255,255,255,.85)">Section headings, justified body paragraphs</li>
+        <li style="color:rgba(255,255,255,.85)">Tables exported as native Word tables</li>
+        <li style="color:rgba(255,255,255,.85)">File named automatically from article title</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 12: SETTINGS ── -->
+<div class="slide t-white" id="s12">
+  <div class="accent-bar"></div>
+  <div class="label">Settings &amp; Personalisation</div>
+  <div class="h1" style="margin-bottom:.6em">Configure the tool to match your workflow</div>
+  <div class="g2" style="flex:1;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:.85em">
+      <div class="card"><div class="ct">🔑 Bring Your Own API Key</div><div class="cd">Use your own Groq, OpenAI, or OpenRouter account. Keys are stored encrypted and never shown after saving. Falls back to the shared server key if not set.</div></div>
+      <div class="card"><div class="ct">🤖 AI Provider &amp; Model</div><div class="cd">Choose your provider and model. Default: Groq Llama 3.3 70B. Claude and Gemini support coming in a future sprint. Dynamic model list fetched automatically.</div></div>
+      <div class="card"><div class="ct">🌐 Output Language</div><div class="cd">Select the language for all AI-generated content. PubMed sources are always in English — the AI synthesises them in the language you choose.</div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.85em">
+      <div class="card"><div class="ct">🎨 Writing Style</div><div class="cd">Choose preset academic writing styles (concise, verbose, clinical, narrative) or paste a writing sample. AI matches your preferred tone, sentence length, and citation density.</div></div>
+      <div class="card"><div class="ct">🔒 Strict Mode</div><div class="cd">Block AI generation unless at least one paper is selected in the library — guarantees every paragraph is always evidence-grounded.</div></div>
+      <div class="card"><div class="ct">🔬 NCBI API Key</div><div class="cd">Add your own NCBI key to raise the PubMed rate limit from 3 to 10 requests per second — useful for batch PMID imports.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SLIDE 13: ROADMAP ── -->
+<div class="slide t-navy" id="s13">
+  <div class="label" style="color:rgba(255,165,50,.9)">What's Coming</div>
+  <div class="h1 h1-white" style="margin-bottom:4%">Roadmap highlights</div>
+  <div class="rg">
+    <div class="ri"><div class="ri-icon">🤖</div><div><strong>One-Click Full Draft</strong><span>Write all 13 sections with a single button — review and approve each section before the AI moves to the next</span></div></div>
+    <div class="ri"><div class="ri-icon">🔄</div><div><strong>Real-time Collaboration</strong><span>Multiple authors editing simultaneously — changes sync live. Read-only shareable links for reviewers</span></div></div>
+    <div class="ri"><div class="ri-icon">📋</div><div><strong>EQUATOR Checklists</strong><span>Auto-fill CONSORT, PRISMA, and STROBE reporting checklists from your article content</span></div></div>
+    <div class="ri"><div class="ri-icon">🎯</div><div><strong>Journal-Specific Checks</strong><span>Pick a target journal — AI checks word limits, required sections, reference format, and abstract structure</span></div></div>
+    <div class="ri"><div class="ri-icon">🌐</div><div><strong>More Research Sources</strong><span>Dimensions.ai and Semantic Scholar alongside PubMed — broader coverage beyond biomedical research</span></div></div>
+    <div class="ri"><div class="ri-icon">📊</div><div><strong>LaTeX Export</strong><span>Export as .tex for Elsevier, Springer, and other journal submission systems</span></div></div>
+  </div>
+</div>
+
+<!-- ── SLIDE 14: SUMMARY ── -->
+<div class="slide t-grad" id="s14">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+    <div class="label" style="color:rgba(255,165,50,.9)">Medical Article Writer</div>
+    <div class="h1 h1-white" style="font-size:clamp(1.8rem,4vw,3rem);max-width:640px;margin-bottom:5%">
+      A smarter way to write medical review articles
+    </div>
+    <div class="g4" style="width:100%;max-width:760px">
+      <div style="background:rgba(255,255,255,.1);border-radius:11px;padding:5% 4%;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:.4em">📝</div>
+        <div style="font-size:.78rem;font-weight:600;color:#fff;line-height:1.4">Structured 13-section editor</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:11px;padding:5% 4%;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:.4em">🔬</div>
+        <div style="font-size:.78rem;font-weight:600;color:#fff;line-height:1.4">PubMed-grounded AI writing</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:11px;padding:5% 4%;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:.4em">✅</div>
+        <div style="font-size:.78rem;font-weight:600;color:#fff;line-height:1.4">Quality &amp; coherence checks</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:11px;padding:5% 4%;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:.4em">📄</div>
+        <div style="font-size:.78rem;font-weight:600;color:#fff;line-height:1.4">PDF &amp; Word export</div>
+      </div>
+    </div>
+    <div style="margin-top:6%;font-size:.8rem;color:rgba(255,255,255,.45)">
+      Access from any device · Auto-saves every 1.5 s · Personal article dashboard
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+</div><!-- /wrapper -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button class="nb" id="pb" onclick="go(-1)" disabled>← Previous</button>
+  <span class="sc" id="sc">1 / 14</span>
+  <button class="nb" id="nb" onclick="go(1)">Next →</button>
+</div>
+<div class="pbar"><div class="pfill" id="pf" style="width:7.14%"></div></div>
+
+<script>
+const N = 14;
+let cur = 1;
+function go(d) {
+  const prev = document.getElementById('s' + cur);
+  cur = Math.max(1, Math.min(N, cur + d));
+  const next = document.getElementById('s' + cur);
+  prev.classList.remove('active');
+  if (d > 0) { prev.classList.add('out'); setTimeout(() => prev.classList.remove('out'), 400); }
+  next.classList.add('active');
+  document.getElementById('sc').textContent = cur + ' / ' + N;
+  document.getElementById('pf').style.width = (cur / N * 100) + '%';
+  document.getElementById('pb').disabled = cur === 1;
+  document.getElementById('nb').disabled = cur === N;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); if (cur < N) go(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); if (cur > 1) go(-1); }
+});
+</script>
+</body>
+</html>
