@@ -26,7 +26,7 @@ Reply with ONLY one word from the list above.`;
 
   try {
     const result = await createCompletionForUser({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       max_tokens: 10,
       temperature: 0,
       messages: [{ role: "user", content: prompt }],
@@ -131,7 +131,7 @@ Return ONLY the JSON.`;
 
   try {
     const result = await createCompletionForUser({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       max_tokens: 150,
       temperature: 0,
       messages: [{ role: "user", content: prompt }],

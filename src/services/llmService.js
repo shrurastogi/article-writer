@@ -4,7 +4,7 @@ const OpenAI = require("openai");
 const { decrypt } = require("./encryptionService");
 
 const PROVIDER_CONFIG = {
-  groq:    { baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile" },
+  groq:    { baseURL: "https://api.groq.com/openai/v1", defaultModel: "openai/gpt-oss-120b" },
   mistral: { baseURL: "https://api.mistral.ai/v1",       defaultModel: "mistral-large-latest" },
   openai:  { baseURL: "https://api.openai.com/v1",       defaultModel: "gpt-4o-mini" },
 };
